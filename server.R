@@ -1,4 +1,4 @@
-# ============================================================
+  # ============================================================
 # Archivo: server.R
 # Proyecto: EDA de Criptomonedas con API de Mercado
 # ============================================================
@@ -14,7 +14,6 @@ server <- function(input, output, session) {
     if (!is.null(simbolo)) d <- d %>% filter(simbolo == !!simbolo)
     d
   }
-
   # ══════════════════════════════════════════════════════════
   # TAB 1 — VISIÓN GENERAL
   # ══════════════════════════════════════════════════════════
@@ -27,10 +26,17 @@ server <- function(input, output, session) {
   })
   output$vbox_periodo <- renderValueBox({
     rango <- paste0(
-      format(min(hist_data$fecha), "%d/%m/%Y"), " — ",
-      format(max(hist_data$fecha), "%d/%m/%Y")
+      format(min(hist_data$fecha), "%d/%m/%y"), 
+      " — ", 
+      format(max(hist_data$fecha), "%d/%m/%y")
     )
-    valueBox(rango, "Período de Datos", icon = icon("calendar"), color = "green")
+    
+    valueBox(
+      value = tags$p(rango, style = "font-size: 19px; margin: 0; line-height: 1.2;"),
+      subtitle = "Período de Datos",
+      icon = icon("calendar"),
+      color = "green"
+    )
   })
   output$vbox_missing <- renderValueBox({
     valueBox(sum(is.na(hist_data)), "Valores Faltantes", icon = icon("triangle-exclamation"), color = "red")

@@ -71,7 +71,7 @@ La app usa **CryptoCompare API** (https://min-api.cryptocompare.com).
 
 La clave API está definida en `global.R`:
 ```r
-API_KEY <- "tu_clave_aqui"
+API_KEY <- "ce6e922820dabbb917d5f6fd82b867726fbf320cf3f7414b33748c19e9514aae"
 ```
 
 **Endpoints utilizados:**
