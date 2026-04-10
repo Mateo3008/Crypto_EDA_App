@@ -200,7 +200,7 @@ Los modelos ARIMA completos con validación train/test, evaluación de error (MA
 
 ## Equipo
 
-Mateo Barrios Royet
+Mateo Barrios Royet-
 Rafael Romero
 
 ---
