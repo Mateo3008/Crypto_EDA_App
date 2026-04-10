@@ -36,12 +36,9 @@ Dashboard interactivo que consume datos en tiempo real de la API de [CryptoCompa
 
 ## Opción 1 — Correr en local
 
-### 1. Clonar el repositorio
+### 1. Clonar el repositorio o descargar archivo .zip del siguiente enlace
 
-```bash
-git clone https://github.com/sebcasro/DS4A_Team88.git
-cd DS4A_Team88
-```
+https://github.com/Mateo3008/Crypto_EDA_App/tree/main
 
 ### 2. Abrir en RStudio
 
