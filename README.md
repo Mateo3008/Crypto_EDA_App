@@ -1,7 +1,7 @@
 # Crypto EDA Dashboard
 
 **Análisis Exploratorio de Criptomonedas con R/Shiny**  
-Mateo Barrios · Rafael Romero — Proyecto Académico 2025
+Mateo Barrios · Rafael Romero — Proyecto Académico 2026
 
 ---
 
@@ -36,12 +36,9 @@ Dashboard interactivo que consume datos en tiempo real de la API de [CryptoCompa
 
 ## Opción 1 — Correr en local
 
-### 1. Clonar el repositorio
+### 1. Clonar el repositorio o descargar archivo .zip del siguiente enlace
 
-```bash
-git clone https://github.com/sebcasro/DS4A_Team88.git
-cd DS4A_Team88
-```
+https://github.com/Mateo3008/Crypto_EDA_App/tree/main
 
 ### 2. Abrir en RStudio
 
@@ -86,12 +83,9 @@ Esta opción publica la app en un link público. Cualquier persona puede abrirla
 
 Ir a [https://www.shinyapps.io/](https://www.shinyapps.io/) y registrarse. El plan gratuito incluye hasta 5 apps activas y 25 horas de uso mensual — más que suficiente para un proyecto académico.
 
-### 2. Clonar el repositorio
+### 2. tener descargado el repositorio y descomprimido
 
-```bash
-git clone https://github.com/sebcasro/DS4A_Team88.git
-cd DS4A_Team88
-```
+https://github.com/Mateo3008/Crypto_EDA_App/tree/main
 
 ### 3. Instalar dependencias y rsconnect
 
@@ -127,9 +121,7 @@ rsconnect::deployApp(".")
 
 RStudio sube todos los archivos automáticamente. Al terminar abre el link en el navegador. Queda algo así:
 
-```
-https://tu-usuario.shinyapps.io/DS4A_Team88/
-```
+https://mateobarrios.shinyapps.io/Crypto_EDA_App/
 
 Ese link se puede compartir con el profesor o cualquier persona directamente.
 
@@ -138,7 +130,7 @@ Ese link se puede compartir con el profesor o cualquier persona directamente.
 ## Estructura del proyecto
 
 ```
-DS4A_Team88/
+Crypto_EDA_App/
 ├── global.R      # Librerías, configuración API, carga de datos
 ├── ui.R          # Interfaz de usuario (shinydashboard)
 ├── server.R      # Lógica reactiva y gráficos
@@ -208,10 +200,8 @@ Los modelos ARIMA completos con validación train/test, evaluación de error (MA
 
 ## Equipo
 
-| Nombre | Rol |
-|---|---|
-| Mateo Barrios | Científico de Datos |
-| Rafael Romero | Analista de Datos |
+Mateo Barrios Royet-
+Rafael Romero
 
 ---
 
