@@ -1,7 +1,7 @@
 # Crypto EDA Dashboard
 
 **Análisis Exploratorio de Criptomonedas con R/Shiny**  
-Mateo Barrios · Rafael Romero — Proyecto Académico 2025
+Mateo Barrios · Rafael Romero — Proyecto Académico 2026
 
 ---
 
