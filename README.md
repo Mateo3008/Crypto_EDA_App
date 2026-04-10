@@ -1,106 +1,218 @@
-# 📊 Crypto EDA Dashboard — Proyecto Shiny
+# Crypto EDA Dashboard
 
-## 🎯 Objetivo del Proyecto
-
-Construir un dashboard interactivo en R/Shiny que realice un **Análisis Exploratorio de Datos (EDA)** completo sobre el mercado de criptomonedas, consumiendo datos en tiempo real desde la API de CryptoCompare. El dashboard permite a analistas e inversores explorar el comportamiento histórico de los precios, los patrones de retornos y las relaciones entre activos digitales de forma visual e interactiva.
-
----
-
-## 🔍 Problema que Resuelve
-
-El mercado de criptomonedas es altamente volátil y difícil de interpretar sin herramientas adecuadas. Los inversores y analistas necesitan:
-
-1. **Visualizar tendencias** de precios con indicadores técnicos (medias móviles, Bandas de Bollinger).
-2. **Cuantificar el riesgo** a través de métricas estadísticas (VaR, Sharpe, volatilidad).
-3. **Entender las correlaciones** entre distintos activos para tomar decisiones de portafolio.
-4. **Comparar el rendimiento** acumulado entre criptomonedas en el mismo horizonte temporal.
+**Análisis Exploratorio de Criptomonedas con R/Shiny**  
+Mateo Barrios · Rafael Romero — Proyecto Académico 2025
 
 ---
 
-## 🗂️ Estructura del Proyecto
+## ¿Qué hace este proyecto?
+
+Dashboard interactivo que consume datos en tiempo real de la API de [CryptoCompare](https://min-api.cryptocompare.com/) para analizar el comportamiento histórico de 10 criptomonedas. El análisis está orientado hacia la construcción futura de un modelo predictivo de precios basado en ARIMA.
+
+**Monedas analizadas:** BTC · ETH · USDC · SOL · XRP · TAO · USDT · DOGE · USD1 · ZEC
+
+---
+
+## Módulos del dashboard
+
+| Pestaña | Contenido |
+|---|---|
+| **Introducción** | Contexto del proyecto, objetivo, integrantes |
+| **Visión General** | Precios actuales, capitalización de mercado, volumen 24h |
+| **Precios** | Serie temporal, medias móviles, Bandas de Bollinger, candlestick |
+| **Retornos & Riesgo** | Distribución de retornos, VaR 95%, CVaR, Sharpe, drawdown |
+| **Correlaciones** | Heatmap de correlación, scatter entre pares, análisis de diversificación |
+| **Comparador** | Rendimiento acumulado normalizado en base 100 |
+| **Análisis (EDA → Modelo)** | Box plot, descomposición STL, ACF/PACF, test ADF, contextualización ARIMA |
+
+---
+
+## Requisitos
+
+- R >= 4.2.0
+- RStudio (recomendado) o R desde terminal
+
+---
+
+## Opción 1 — Correr en local
+
+### 1. Clonar el repositorio
+
+```bash
+git clone https://github.com/sebcasro/DS4A_Team88.git
+cd DS4A_Team88
+```
+
+### 2. Abrir en RStudio
+
+Abre cualquiera de los tres archivos (`global.R`, `ui.R` o `server.R`) desde RStudio. Los tres deben estar en la misma carpeta.
+
+### 3. Instalar dependencias
+
+Ejecuta esto una sola vez en la consola de R:
+
+```r
+install.packages(c(
+  "shiny",
+  "shinydashboard",
+  "tidyverse",
+  "plotly",
+  "DT",
+  "lubridate",
+  "scales",
+  "jsonlite",
+  "httr",
+  "zoo",
+  "forecast",
+  "tseries"
+))
+```
+
+### 4. Correr la app
+
+```r
+shiny::runApp(".")
+```
+
+O desde RStudio con el botón **Run App** que aparece en la esquina superior derecha al abrir cualquiera de los archivos.
+
+---
+
+## Opción 2 — Despliegue en shinyapps.io ⭐ recomendado
+
+Esta opción publica la app en un link público. Cualquier persona puede abrirla en el navegador **sin instalar R ni ninguna librería**.
+
+### 1. Crear cuenta gratuita
+
+Ir a [https://www.shinyapps.io/](https://www.shinyapps.io/) y registrarse. El plan gratuito incluye hasta 5 apps activas y 25 horas de uso mensual — más que suficiente para un proyecto académico.
+
+### 2. Clonar el repositorio
+
+```bash
+git clone https://github.com/sebcasro/DS4A_Team88.git
+cd DS4A_Team88
+```
+
+### 3. Instalar dependencias y rsconnect
+
+```r
+install.packages(c(
+  "shiny", "shinydashboard", "tidyverse", "plotly",
+  "DT", "lubridate", "scales", "jsonlite", "httr",
+  "zoo", "forecast", "tseries", "rsconnect"
+))
+```
+
+### 4. Conectar tu cuenta de shinyapps.io
+
+En el sitio de shinyapps.io ve a **Account → Tokens → Show** y copia el comando que aparece. Se ve así:
+
+```r
+rsconnect::setAccountInfo(
+  name   = "tu-usuario",
+  token  = "TU_TOKEN",
+  secret = "TU_SECRET"
+)
+```
+
+Pégalo en la consola de RStudio y ejecútalo.
+
+### 5. Publicar la app
+
+Con la carpeta del proyecto abierta en RStudio, ejecuta:
+
+```r
+rsconnect::deployApp(".")
+```
+
+RStudio sube todos los archivos automáticamente. Al terminar abre el link en el navegador. Queda algo así:
 
 ```
-Crypto_EDA_App/
+https://tu-usuario.shinyapps.io/DS4A_Team88/
+```
+
+Ese link se puede compartir con el profesor o cualquier persona directamente.
+
+---
+
+## Estructura del proyecto
+
+```
+DS4A_Team88/
 ├── global.R      # Librerías, configuración API, carga de datos
 ├── ui.R          # Interfaz de usuario (shinydashboard)
-├── server.R      # Lógica del servidor y gráficos reactivos
+├── server.R      # Lógica reactiva y gráficos
 └── www/
     └── crypto.svg  # Logo de la aplicación
 ```
 
 ---
 
-## 📦 Dependencias (R)
+## Fuente de datos
 
-Instalar antes de ejecutar:
+La app usa la **CryptoCompare API** para obtener:
 
-```r
-install.packages(c(
-  "shiny", "shinydashboard", "tidyverse",
-  "plotly", "DT", "lubridate", "scales",
-  "jsonlite", "httr", "zoo"
-))
+- Datos OHLCV diarios (~840 días de historial por moneda)
+- Precio spot, capitalización y volumen en tiempo real
+
+Si la API no responde al iniciar, la app genera automáticamente datos de ejemplo para que el dashboard siga funcionando sin interrupciones.
+
+**Endpoint historial:**
+```
+GET https://min-api.cryptocompare.com/data/v2/histoday
+    ?fsym={SYMBOL}&tsym=USD&limit=840&api_key={KEY}
+```
+
+**Endpoint precios actuales:**
+```
+GET https://min-api.cryptocompare.com/data/pricemultifull
+    ?fsyms={SYMBOLS}&tsyms=USD&api_key={KEY}
 ```
 
 ---
 
-## 🚀 Cómo Ejecutar
+## Análisis incluidos
 
-```r
-# En RStudio, desde el directorio del proyecto:
-shiny::runApp("Crypto_EDA_App")
-```
+### Estadísticos descriptivos
+- Media, mediana, desviación estándar, asimetría, curtosis
+- VaR 95% y CVaR (Expected Shortfall)
+- Sharpe ratio anualizado y volatilidad anualizada
+
+### Series de tiempo (EDA orientado al modelo)
+- Descomposición STL (tendencia + estacionalidad + residuo)
+- Funciones ACF y PACF con bandas de confianza al 95%
+- Test Augmented Dickey-Fuller (ADF) de estacionariedad
+- Box plot interactivo de precio de cierre por mes
+- Contextualización teórica del modelo ARIMA(p,d,q)
+
+### Próxima fase
+Los modelos ARIMA completos con validación train/test, evaluación de error (MAE, RMSE) y forecast formal se implementarán en la siguiente entrega del proyecto.
 
 ---
 
-## 🖥️ Pestañas del Dashboard
+## Dependencias principales
 
-| Pestaña | Descripción |
+| Librería | Uso |
 |---|---|
-| **Visión General** | Precios actuales, capitalización de mercado y volumen de negociación 24h |
-| **Precios & Tendencia** | Serie temporal con MA7, MA30, Bandas de Bollinger y gráfico de velas |
-| **Retornos & Riesgo** | Histograma de retornos, box plots por mes, volatilidad rodante 30d |
-| **Correlaciones** | Heatmap de correlación entre retornos y scatter plot interactivo |
-| **Comparador** | Rendimiento acumulado normalizado (base 100 o %) entre múltiples activos |
+| `shiny` + `shinydashboard` | Framework de la app |
+| `tidyverse` | Manipulación y transformación de datos |
+| `plotly` | Gráficos interactivos |
+| `DT` | Tablas interactivas |
+| `httr` + `jsonlite` | Conexión a la API REST |
+| `zoo` | Medias móviles y ventanas rodantes |
+| `forecast` | `auto.arima()`, ACF, PACF |
+| `tseries` | Test ADF de estacionariedad |
+| `rsconnect` | Despliegue en shinyapps.io |
 
 ---
 
-## 🔑 Configuración de la API
+## Equipo
 
-La app usa **CryptoCompare API** (https://min-api.cryptocompare.com).
-
-La clave API está definida en `global.R`:
-```r
-API_KEY <- "ce6e922820dabbb917d5f6fd82b867726fbf320cf3f7414b33748c19e9514aae"
-```
-
-**Endpoints utilizados:**
-- `GET /data/v2/histoday` — OHLCV histórico diario
-- `GET /data/pricemultifull` — Precio y métricas en tiempo real
+| Nombre | Rol |
+|---|---|
+| Mateo Barrios | Científico de Datos |
+| Rafael Romero | Analista de Datos |
 
 ---
 
-## 📈 Criptomonedas Analizadas
-
-| Símbolo | Nombre    |
-|---------|-----------|
-| BTC     | Bitcoin   |
-| ETH     | Ethereum  |
-| BNB     | BNB       |
-| SOL     | Solana    |
-| XRP     | XRP       |
-
----
-
-## 📐 Métricas de Riesgo Calculadas
-
-- **Retorno medio diario** — promedio aritmético de retornos
-- **Desviación estándar** — medida de dispersión/volatilidad
-- **VaR 95%** — Valor en Riesgo: pérdida máxima esperada el 5% del tiempo
-- **Sharpe aproximado** — retorno por unidad de riesgo (sin tasa libre de riesgo)
-- **% Días positivos** — proporción de sesiones con retorno positivo
-- **Volatilidad rodante 30d** — desviación estándar móvil de 30 días
-
----
-
-*Desarrollado como proyecto de EDA con R/Shiny · API: CryptoCompare*
+*Fuente de datos: [CryptoCompare API](https://min-api.cryptocompare.com/) · Framework: [R Shiny](https://shiny.posit.co/) · Despliegue: [shinyapps.io](https://www.shinyapps.io/)*

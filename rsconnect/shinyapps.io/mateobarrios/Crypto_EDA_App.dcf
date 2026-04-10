@@ -1,0 +1,12 @@
+name: Crypto_EDA_App
+title: Crypto_EDA_App
+username: mateobarrios
+account: mateobarrios
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 16991426
+bundleId: 11834328
+url: https://mateobarrios.shinyapps.io/Crypto_EDA_App/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
