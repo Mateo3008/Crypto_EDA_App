@@ -144,7 +144,7 @@ Crypto_EDA_App/
 
 La app usa la **CryptoCompare API** para obtener:
 
-- Datos OHLCV diarios (~840 días de historial por moneda)
+- Datos OHLCV diarios (~1905 días de historial por moneda)
 - Precio spot, capitalización y volumen en tiempo real
 
 Si la API no responde al iniciar, la app genera automáticamente datos de ejemplo para que el dashboard siga funcionando sin interrupciones.
