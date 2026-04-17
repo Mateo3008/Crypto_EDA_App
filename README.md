@@ -29,35 +29,6 @@ El diseño sigue un estilo fintech profesional inspirado en Bloomberg Terminal y
 
 ---
 
-## Funcionalidades destacadas
-
-### Bandas de Bollinger
-Indicador técnico de volatilidad incluido en la pestaña **Precios**. Permite configurar:
-- **Criptomoneda** a analizar
-- **Período de la SMA** (5 a 60 días)
-- **Desviaciones estándar k** (1 a 3)
-
-Incluye dos gráficos: el canal de bandas sobre el precio de cierre, y el **ancho de banda relativo** como medida de volatilidad histórica.
-
-```
-BB± = SMAₙ ± k · σₙ
-%Bandwidth = (BB₊ − BB₋) / SMAₙ × 100
-```
-
-### Tema claro / oscuro
-Botón en el sidebar con persistencia en `localStorage`. Se recuerda entre sesiones.
-
-### Animaciones de trazado progresivo
-Los gráficos de línea se dibujan de izquierda a derecha al cargarse. Las barras crecen desde cero. La animación se repite automáticamente cada vez que se cambia un slider o selector.
-
-### Overlay de carga contextual
-Al cambiar parámetros pesados aparece un loader semitransparente con mensajes rotativos: *"Consultando API…"*, *"Calculando Bollinger…"*, *"Renderizando gráfico…"*, etc.
-
-### Fondo de partículas interactivo
-Implementado con `particles.js`. Las partículas reaccionan al cursor (modo `grab`) y tienen un ligero efecto parallax con el movimiento del mouse.
-
----
-
 ## Requisitos
 
 - R >= 4.2.0
