@@ -74,7 +74,7 @@ server <- function(input, output, session) {
   
   output$vbox_periodo <- renderValueBox({
     rango <- paste(format(min(hist_data$fecha), "%d/%m/%y"), "—", format(max(hist_data$fecha), "%d/%m/%y"))
-    valueBox(tags$p(rango, style = "font-size: 16px;"), "Período (840 días)", icon = icon("calendar"), color = "green")
+    valueBox(tags$p(rango, style = "font-size: 16px;"), "Período (1905 días)", icon = icon("calendar"), color = "green")
   })
   
   output$vbox_missing <- renderValueBox({
@@ -165,7 +165,9 @@ server <- function(input, output, session) {
             decreasing = list(line = list(color = "#e74c3c"))) %>%
       layout(title = paste("Candlestick -", input$sel_crypto_precio), 
              xaxis = list(title = ""), yaxis = list(title = "Precio (USD)"))
+    
   })
+  
   
   # ============================================================
   # TAB 3 - RETORNOS & RIESGO

@@ -36,7 +36,7 @@ CRYPTOS <- c(
 # -------------------------------------------------------------------
 # FUNCIÓN: OBTENER DATOS HISTÓRICOS
 # -------------------------------------------------------------------
-get_historical_daily <- function(fsym, tsym = "USD", limit = 840) {
+get_historical_daily <- function(fsym, tsym = "USD", limit = 1905) {
   url <- paste0(BASE_URL, "/v2/histoday?fsym=", fsym, "&tsym=", tsym, 
                 "&limit=", limit, "&api_key=", API_KEY)
   url <- URLencode(url)
