@@ -32,6 +32,7 @@ El diseño sigue un estilo fintech profesional inspirado en Bloomberg Terminal y
 
 ---
 
+<<<<<<< HEAD
 ## Funcionalidades destacadas
 
 ### Bandas de Bollinger
@@ -92,6 +93,8 @@ Crypto_EDA_App/
 
 ---
 
+=======
+>>>>>>> 82c4b34f23986804d37d9a7f5e71c02d0101e663
 ## Requisitos
 
 - R >= 4.2.0
