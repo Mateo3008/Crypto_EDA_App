@@ -1,0 +1,1329 @@
+---
+title: "Crypto EDA Dashboard"
+subtitle: "Análisis Exploratorio de Criptomonedas con R / Shiny"
+author:
+  - "Mateo Barrios — Ciencia de Datos"
+  - "Rafael Romero — Ciencia de Datos"
+date: "`r format(Sys.Date(), '%d de %B de %Y')`"
+output:
+  bookdown::html_document2:
+    toc: true
+    toc_depth: 3
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    number_sections: true
+    theme: flatly
+    highlight: tango
+    code_folding: show
+    fig_caption: true
+    df_print: paged
+    css: |
+      body { font-family: 'Inter', sans-serif; }
+      h1, h2, h3 { color: #2c3e50; }
+      .callout-box {
+        background: #f0f4ff;
+        border-left: 4px solid #627EEA;
+        padding: 12px 16px;
+        margin: 16px 0;
+        border-radius: 4px;
+      }
+      .formula-box {
+        background: #fff8f0;
+        border-left: 4px solid #F7931A;
+        padding: 12px 16px;
+        margin: 16px 0;
+        border-radius: 4px;
+        font-family: monospace;
+      }
+bibliography: []
+link-citations: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo       = TRUE,
+  warning    = FALSE,
+  message    = FALSE,
+  fig.align  = "center",
+  fig.width  = 10,
+  fig.height = 5,
+  cache      = FALSE
+)
+
+# ── Paquetes ──────────────────────────────────────────────────────────────────
+library(tidyverse)
+library(plotly)
+library(DT)
+library(lubridate)
+library(scales)
+library(jsonlite)
+library(httr)
+library(zoo)
+library(forecast)
+library(tseries)
+library(knitr)
+library(kableExtra)
+```
+
+---
+
+# Introducción {#intro}
+
+## Descripción del Proyecto
+
+Este documento presenta el análisis exploratorio completo del **Crypto EDA Dashboard**, un proyecto académico que consume datos en tiempo real de la API de [CryptoCompare](https://min-api.cryptocompare.com/) para analizar el comportamiento histórico de 10 criptomonedas.
+
+El análisis está orientado hacia la construcción de un **modelo predictivo de precios basado en ARIMA**, cubriendo desde la obtención y limpieza de datos hasta el ajuste, validación y predicción con series de tiempo.
+
+<div class="callout-box">
+**Repositorio:** [https://github.com/Mateo3008/Crypto_EDA_App](https://github.com/Mateo3008/Crypto_EDA_App)  
+**Framework:** R Shiny + shinydashboard  
+**Fuente de datos:** CryptoCompare API (OHLCV diario, ~1905 días por moneda)
+</div>
+
+## Criptomonedas Analizadas
+
+```{r cryptos-tabla}
+cryptos <- tibble(
+  Nombre     = c("Bitcoin","Ethereum","USD Coin","Solana","XRP",
+                 "Bittensor","Tether","Dogecoin","USD1","Zcash"),
+  Símbolo    = c("BTC","ETH","USDC","SOL","XRP",
+                 "TAO","USDT","DOGE","USD1","ZEC"),
+  Categoría  = c("Store of Value","Smart Contract","Stablecoin","Smart Contract",
+                 "Payments","AI / Subnet","Stablecoin","Meme","Stablecoin","Privacy")
+)
+
+kable(cryptos, caption = "Criptomonedas incluidas en el análisis",
+      booktabs = TRUE) |>
+  kable_styling(bootstrap_options = c("striped","hover","condensed"),
+                full_width = FALSE)
+```
+
+## Objetivo Académico
+
+El objetivo principal es aplicar técnicas de **Análisis Exploratorio de Datos (EDA)** sobre series temporales financieras para:
+
+1. Caracterizar la distribución de precios y retornos de cada activo.
+2. Cuantificar el riesgo mediante métricas como la volatilidad rodante y el VaR.
+3. Identificar correlaciones entre criptomonedas.
+4. Evaluar la estacionariedad de las series y aplicar transformaciones necesarias.
+5. Ajustar modelos ARIMA(p, d, q) para la predicción de precios a corto plazo.
+
+---
+
+# Configuración y Carga de Datos {#datos}
+
+## Parámetros de la API
+
+```{r config}
+API_KEY  <- "ce6e922820dabbb917d5f6fd82b867726fbf320cf3f7414b33748c19e9514aae"
+BASE_URL <- "https://min-api.cryptocompare.com/data"
+
+CRYPTOS <- c(
+  "Bitcoin"   = "BTC", "Ethereum"  = "ETH", "USD Coin"  = "USDC",
+  "Solana"    = "SOL", "XRP"       = "XRP", "Bittensor" = "TAO",
+  "Tether"    = "USDT","Dogecoin"  = "DOGE","USD1"      = "USD1",
+  "Zcash"     = "ZEC"
+)
+
+COLOR_PALETTE <- c(
+  "#2E86AB","#A23B72","#F18F01","#C73E1D","#6A994E",
+  "#BC4A6C","#3D5A80","#EE6C4D","#98C1D9","#293241"
+)
+names(COLOR_PALETTE) <- CRYPTOS
+```
+
+## Funciones de Extracción
+
+### Datos Históricos OHLCV
+
+La función `get_historical_daily()` consulta el endpoint `/v2/histoday` de CryptoCompare y retorna un `data.frame` con columnas OHLCV, retornos simples, logarítmicos y volatilidad diaria:
+
+```{r func-historico}
+get_historical_daily <- function(fsym, tsym = "USD", limit = 1905) {
+  url <- paste0(BASE_URL, "/v2/histoday?fsym=", fsym, "&tsym=", tsym,
+                "&limit=", limit, "&api_key=", API_KEY)
+  url <- URLencode(url)
+
+  tryCatch({
+    resp <- GET(url, timeout(30))
+    if (http_error(resp)) return(NULL)
+
+    data <- fromJSON(content(resp, "text", encoding = "UTF-8"))
+    if (is.null(data$Data$Data)) return(NULL)
+
+    df <- as.data.frame(data$Data$Data) |>
+      mutate(
+        fecha      = as.Date(as.POSIXct(time, origin = "1970-01-01")),
+        simbolo    = fsym,
+        open       = as.numeric(open),
+        high       = as.numeric(high),
+        low        = as.numeric(low),
+        close      = as.numeric(close),
+        volume     = as.numeric(volumefrom),
+        retorno    = (close - lag(close)) / lag(close) * 100,
+        retorno_log = log(close / lag(close)) * 100,
+        volatilidad = abs(high - low) / open * 100
+      ) |>
+      filter(!is.na(retorno))
+    return(df)
+  }, error = function(e) return(NULL))
+}
+```
+
+### Precios en Tiempo Real
+
+```{r func-precios}
+get_price_overview <- function(fsyms, tsym = "USD") {
+  fsyms_str <- paste(fsyms, collapse = ",")
+  url <- paste0(BASE_URL, "/pricemultifull?fsyms=", fsyms_str,
+                "&tsyms=", tsym, "&api_key=", API_KEY)
+  url <- URLencode(url)
+
+  tryCatch({
+    resp <- GET(url, timeout(30))
+    if (http_error(resp)) return(NULL)
+
+    data <- fromJSON(content(resp, "text", encoding = "UTF-8"))
+    if (is.null(data$RAW)) return(NULL)
+
+    rows <- list()
+    for (sym in fsyms) {
+      if (!is.null(data$RAW[[sym]]) && !is.null(data$RAW[[sym]][[tsym]])) {
+        d <- data$RAW[[sym]][[tsym]]
+        rows[[sym]] <- data.frame(
+          simbolo        = sym,
+          precio         = d$PRICE,
+          cambio_24h_pct = d$CHANGEPCT24HOUR,
+          volumen_24h    = d$VOLUME24HOURTO,
+          cap_mercado    = d$MKTCAP,
+          stringsAsFactors = FALSE
+        )
+      }
+    }
+    if (length(rows) == 0) return(NULL)
+    return(bind_rows(rows))
+  }, error = function(e) return(NULL))
+}
+```
+
+## Descarga de Datos
+
+```{r carga-datos, cache=TRUE}
+cat("=== CARGANDO DATOS (10 monedas, 1905 días) ===\n")
+hist_data <- NULL
+
+for (crypto in CRYPTOS) {
+  cat("Cargando", crypto, "... ")
+  data <- get_historical_daily(crypto, limit = 1905)
+  if (!is.null(data) && nrow(data) > 0) {
+    hist_data <- bind_rows(hist_data, data)
+    cat("OK (", nrow(data), "días)\n")
+  } else {
+    cat("FALLÓ — generando datos de ejemplo\n")
+  }
+  Sys.sleep(0.3)
+}
+
+# Fallback: datos sintéticos si la API no responde
+if (is.null(hist_data) || nrow(hist_data) == 0) {
+  set.seed(123)
+  fechas <- seq.Date(as.Date("2019-01-01"), as.Date("2024-04-10"), by = "day")
+
+  for (sym in CRYPTOS) {
+    precio_base <- switch(sym,
+      "BTC"=50000,"ETH"=3000,"USDC"=1,"SOL"=100,"XRP"=0.5,
+      "TAO"=300,"USDT"=1,"DOGE"=0.1,"USD1"=1,"ZEC"=30, 1000)
+
+    trend <- seq(0, by=0.0002, length.out=length(fechas)) * precio_base
+    noise <- cumsum(rnorm(length(fechas), 0, precio_base * 0.015))
+    close <- pmax(precio_base + trend + noise, precio_base * 0.1)
+
+    df <- data.frame(
+      fecha       = fechas, simbolo = sym, close = close,
+      open        = c(close[1], close[-length(close)]),
+      high        = close + abs(rnorm(length(fechas), 0, close * 0.02)),
+      low         = close - abs(rnorm(length(fechas), 0, close * 0.02)),
+      retorno     = c(0, diff(close)/close[-length(close)] * 100),
+      retorno_log = c(0, diff(log(close)) * 100),
+      volatilidad = runif(length(fechas), 1, 6)
+    )
+    hist_data <- bind_rows(hist_data, df)
+  }
+}
+
+prices_overview <- get_price_overview(CRYPTOS)
+if (is.null(prices_overview)) {
+  prices_overview <- data.frame(
+    simbolo        = names(CRYPTOS),
+    precio         = c(50000,3000,1,100,0.5,300,1,0.1,1,30),
+    cambio_24h_pct = runif(10,-5,5),
+    volumen_24h    = runif(10,1e8,1e10),
+    cap_mercado    = c(1e12,4e11,5e10,3e10,1e10,5e9,8e10,2e10,4e9,1e9)
+  )
+}
+
+cat("\n✅ Total filas:", nrow(hist_data))
+cat("\n📅 Período:", as.character(min(hist_data$fecha)),
+    "→", as.character(max(hist_data$fecha)))
+cat("\n🪙 Monedas:", paste(unique(hist_data$simbolo), collapse=", "), "\n")
+```
+
+---
+
+# Calidad de los Datos {#calidad}
+
+## Valores Faltantes
+
+```{r missing-summary}
+missing_summary <- function(df) {
+  df |>
+    summarise(across(everything(), ~ sum(is.na(.)))) |>
+    pivot_longer(everything(), names_to = "Variable", values_to = "NAs") |>
+    mutate(Pct = round(NAs / nrow(df) * 100, 2)) |>
+    filter(NAs > 0)
+}
+
+ms_global <- hist_data |>
+  group_by(simbolo) |>
+  summarise(
+    Total_filas  = n(),
+    NAs_close    = sum(is.na(close)),
+    NAs_retorno  = sum(is.na(retorno)),
+    NAs_vol      = sum(is.na(volatilidad)),
+    Pct_NA_close = round(NAs_close / Total_filas * 100, 2)
+  )
+
+kable(ms_global, caption = "Resumen de valores faltantes por moneda",
+      booktabs = TRUE) |>
+  kable_styling(bootstrap_options = c("striped","hover"), full_width = TRUE)
+```
+
+## Mapa de Calor de NAs
+
+```{r heatmap-nas, fig.cap="Porcentaje de valores faltantes por moneda y variable"}
+cols <- c("close","retorno","retorno_log","volatilidad")
+
+df_heat <- hist_data |>
+  group_by(simbolo) |>
+  summarise(across(all_of(intersect(cols, names(hist_data))),
+                   ~ sum(is.na(.)) / n() * 100, .names = "{.col}")) |>
+  pivot_longer(-simbolo, names_to = "Variable", values_to = "pct_na")
+
+ggplot(df_heat, aes(x = Variable, y = simbolo, fill = pct_na)) +
+  geom_tile(color = "white", linewidth = 0.5) +
+  geom_text(aes(label = paste0(round(pct_na, 1), "%")), size = 3) +
+  scale_fill_gradient(low = "white", high = "#e74c3c", name = "% NA") +
+  labs(title = "Porcentaje de NAs por moneda y variable",
+       x = NULL, y = NULL) +
+  theme_minimal(base_size = 12) +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))
+```
+
+## Métodos de Imputación
+
+```{r impute-func}
+handle_missing <- function(df, method = "interpolation") {
+  cols_imp <- c("close","open","high","low","volume","retorno","retorno_log","volatilidad")
+
+  if (method == "remove") return(na.omit(df))
+
+  if (method == "interpolation") {
+    df <- df |> arrange(fecha)
+    for (col in intersect(cols_imp, names(df))) {
+      df[[col]] <- na.approx(df[[col]], na.rm = FALSE)
+      df[[col]] <- na.locf(df[[col]], na.rm = FALSE)
+      df[[col]] <- na.locf(df[[col]], fromLast = TRUE, na.rm = FALSE)
+    }
+    return(df)
+  }
+
+  if (method == "mean") {
+    for (col in intersect(cols_imp, names(df))) {
+      df[[col]][is.na(df[[col]])] <- mean(df[[col]], na.rm = TRUE)
+    }
+    return(df)
+  }
+  return(df)
+}
+```
+
+Se implementaron tres métodos de manejo de valores faltantes:
+
+- **Interpolación lineal** *(método predeterminado)*: utiliza `zoo::na.approx()` seguido de propagación hacia adelante/atrás con `na.locf()`.  
+- **Media global**: reemplaza cada NA por la media de esa columna.  
+- **Eliminación de filas**: descarta registros incompletos con `na.omit()`.
+
+---
+
+# Visión General de Mercado {#vision-general}
+
+## Precios y Capitalización Actuales
+
+```{r overview-tabla}
+prices_overview |>
+  mutate(
+    precio         = dollar(precio, accuracy = 0.01),
+    cambio_24h_pct = paste0(round(cambio_24h_pct, 2), "%"),
+    volumen_24h    = dollar(volumen_24h, accuracy = 1, scale = 1e-6, suffix = "M"),
+    cap_mercado    = dollar(cap_mercado, accuracy = 1, scale = 1e-9, suffix = "B")
+  ) |>
+  rename(
+    Símbolo = simbolo, `Precio USD` = precio, `Cambio 24h` = cambio_24h_pct,
+    `Volumen 24h` = volumen_24h, `Cap. Mercado` = cap_mercado
+  ) |>
+  kable(caption = "Visión general del mercado en tiempo real",
+        booktabs = TRUE) |>
+  kable_styling(bootstrap_options = c("striped","hover"), full_width = TRUE)
+```
+
+## Capitalización de Mercado
+
+```{r cap-mercado, fig.cap="Capitalización de mercado por criptomoneda (miles de millones USD)"}
+df_cap <- prices_overview |>
+  mutate(simbolo = reorder(simbolo, cap_mercado))
+
+ggplot(df_cap, aes(x = simbolo, y = cap_mercado / 1e9, fill = simbolo)) +
+  geom_col(show.legend = FALSE, alpha = 0.85) +
+  geom_text(aes(label = paste0("$", round(cap_mercado / 1e9, 1), "B")),
+            hjust = -0.1, size = 3.5) +
+  coord_flip() +
+  scale_fill_manual(values = COLOR_PALETTE) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15)),
+                     labels = dollar_format(suffix = "B", scale = 1)) +
+  labs(title = "Capitalización de Mercado",
+       x = NULL, y = "Miles de millones USD") +
+  theme_minimal(base_size = 12)
+```
+
+## Volumen de Transacciones (24h)
+
+```{r volumen, fig.cap="Volumen de transacciones en las últimas 24 horas"}
+df_vol <- prices_overview |>
+  mutate(simbolo = reorder(simbolo, volumen_24h))
+
+ggplot(df_vol, aes(x = simbolo, y = volumen_24h / 1e6, fill = simbolo)) +
+  geom_col(show.legend = FALSE, alpha = 0.85) +
+  coord_flip() +
+  scale_fill_manual(values = COLOR_PALETTE) +
+  scale_y_continuous(labels = dollar_format(suffix = "M", scale = 1)) +
+  labs(title = "Volumen 24h", x = NULL, y = "Millones USD") +
+  theme_minimal(base_size = 12)
+```
+
+---
+
+# Análisis de Precios {#precios}
+
+## Distribución de Precios (Boxplot)
+
+```{r boxplot-precios, fig.cap="Distribución de precios de cierre (escala logarítmica) — últimos 365 días"}
+df_365 <- hist_data |>
+  filter(fecha >= max(fecha) - 365)
+
+ggplot(df_365, aes(x = simbolo, y = close, fill = simbolo)) +
+  geom_boxplot(alpha = 0.7, outlier.color = "#e74c3c", outlier.size = 1.5) +
+  stat_summary(fun = "mean", geom = "point", shape = 18, size = 4, color = "white") +
+  scale_y_log10(labels = dollar) +
+  scale_fill_manual(values = COLOR_PALETTE) +
+  coord_flip() +
+  labs(title = "Distribución de Precios de Cierre (últimos 365 días)",
+       x = NULL, y = "Precio USD (escala log)") +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "none")
+```
+
+## Serie Temporal de Precios — BTC
+
+```{r serie-btc, fig.cap="Serie temporal del precio de cierre de Bitcoin (BTC)"}
+df_btc <- hist_data |> filter(simbolo == "BTC") |> arrange(fecha)
+
+ggplot(df_btc, aes(x = fecha, y = close)) +
+  geom_line(color = "#F7931A", linewidth = 0.7) +
+  scale_y_continuous(labels = dollar) +
+  labs(title = "Bitcoin — Precio de Cierre Histórico",
+       x = NULL, y = "Precio (USD)") +
+  theme_minimal(base_size = 12)
+```
+
+## Candlestick — Últimos 60 días (BTC)
+
+```{r candlestick, fig.cap="Gráfico de velas japonesas — BTC, últimos 60 días"}
+df_candle <- df_btc |> tail(60)
+
+plot_ly(df_candle, x = ~fecha, type = "candlestick",
+        open  = ~open,  close = ~close,
+        high  = ~high,  low   = ~low,
+        increasing = list(line = list(color = "#2ecc71")),
+        decreasing = list(line = list(color = "#e74c3c"))) |>
+  layout(title  = "BTC — Últimas 60 Velas Diarias",
+         xaxis  = list(title = ""),
+         yaxis  = list(title = "Precio (USD)"),
+         paper_bgcolor = "white",
+         plot_bgcolor  = "white")
+```
+
+## Bandas de Bollinger
+
+Las Bandas de Bollinger son un indicador de volatilidad que envuelve el precio alrededor de una media móvil simple (SMA).
+
+<div class="formula-box">
+**BB±** = SMAₙ ± k · σₙ  
+**%Bandwidth** = (BB₊ − BB₋) / SMAₙ × 100
+</div>
+
+```{r bollinger-func}
+calculate_bollinger_bands <- function(prices, window = 20, sd_mult = 2) {
+  sma <- rollmean(prices, window, fill = NA, align = "right")
+  sd  <- rollapply(prices, window, sd, fill = NA, align = "right")
+  data.frame(
+    sma   = sma,
+    upper = sma + (sd_mult * sd),
+    lower = sma - (sd_mult * sd)
+  )
+}
+```
+
+```{r bollinger-plot, fig.cap="Bandas de Bollinger — BTC (SMA 20, k=2)"}
+bb <- calculate_bollinger_bands(df_btc$close, window = 20, sd_mult = 2)
+df_bb <- cbind(df_btc, bb) |> drop_na(sma, upper, lower) |> tail(365)
+
+ggplot(df_bb, aes(x = fecha)) +
+  geom_ribbon(aes(ymin = lower, ymax = upper), fill = "#3498db", alpha = 0.18) +
+  geom_line(aes(y = close, color = "Precio"),         linewidth = 0.8) +
+  geom_line(aes(y = sma,   color = "SMA 20"),         linetype = "dashed", linewidth = 0.7) +
+  geom_line(aes(y = upper, color = "Banda Superior"), linetype = "dotted", linewidth = 0.6) +
+  geom_line(aes(y = lower, color = "Banda Inferior"), linetype = "dotted", linewidth = 0.6) +
+  scale_color_manual(values = c(
+    "Precio" = "#e94560", "SMA 20" = "#F7931A",
+    "Banda Superior" = "#2ecc71", "Banda Inferior" = "#2ecc71"
+  )) +
+  scale_y_continuous(labels = dollar) +
+  labs(title = "Bandas de Bollinger — BTC (SMA 20, k = 2)",
+       x = NULL, y = "Precio (USD)", color = NULL) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom")
+```
+
+```{r bollinger-bw, fig.cap="Ancho de banda relativo — medida de volatilidad de Bollinger"}
+df_bb <- df_bb |>
+  mutate(bw = (upper - lower) / sma * 100)
+
+ggplot(df_bb, aes(x = fecha, y = bw)) +
+  geom_line(color = "#627EEA", linewidth = 0.8) +
+  geom_area(fill = "#627EEA", alpha = 0.15) +
+  labs(title = "Ancho de Banda Relativo (%Bandwidth)",
+       x = NULL, y = "%Bandwidth") +
+  theme_minimal(base_size = 12)
+```
+
+---
+
+# Retornos y Riesgo {#retornos}
+
+## Distribución de Retornos
+
+Los retornos se calculan como:
+
+<div class="formula-box">
+**Retorno simple:** rₜ = (Pₜ − Pₜ₋₁) / Pₜ₋₁ × 100  
+**Retorno logarítmico:** rₜˡᵒᵍ = ln(Pₜ / Pₜ₋₁) × 100
+</div>
+
+```{r boxplot-retornos, fig.cap="Distribución de retornos diarios por criptomoneda (últimos 365 días)"}
+ggplot(df_365, aes(x = simbolo, y = retorno, fill = simbolo)) +
+  geom_boxplot(alpha = 0.7, outlier.color = "#e74c3c", outlier.size = 1) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  scale_fill_manual(values = COLOR_PALETTE) +
+  coord_flip() +
+  labs(title = "Distribución de Retornos Diarios",
+       x = NULL, y = "Retorno (%)") +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "none")
+```
+
+## Histograma de Retornos — BTC
+
+```{r hist-retornos, fig.cap="Histograma de retornos diarios de BTC"}
+ggplot(df_btc, aes(x = retorno, fill = after_stat(x) > 0)) +
+  geom_histogram(bins = 60, alpha = 0.85) +
+  scale_fill_manual(values = c("TRUE" = "#2ecc71", "FALSE" = "#e74c3c"),
+                    labels = c("TRUE" = "Positivo", "FALSE" = "Negativo"),
+                    name = NULL) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  labs(title = "Histograma de Retornos Diarios — BTC",
+       x = "Retorno (%)", y = "Frecuencia") +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "top")
+```
+
+## Volatilidad Rodante (30 días)
+
+```{r volatilidad, fig.cap="Volatilidad rodante de 30 días para BTC"}
+df_btc_vol <- df_btc |>
+  arrange(fecha) |>
+  mutate(vol30 = zoo::rollapply(retorno, 30, sd, fill = NA, align = "right"))
+
+ggplot(df_btc_vol, aes(x = fecha, y = vol30)) +
+  geom_line(color = "#e94560", linewidth = 0.7) +
+  geom_area(fill = "#e94560", alpha = 0.15) +
+  labs(title = "Volatilidad Rodante 30 días — BTC",
+       x = NULL, y = "Desv. Est. Retorno (%)") +
+  theme_minimal(base_size = 12)
+```
+
+## Tabla de Riesgo por Criptomoneda
+
+```{r tabla-riesgo}
+tabla_riesgo <- df_365 |>
+  group_by(simbolo) |>
+  summarise(
+    `Ret. Medio (%)` = round(mean(retorno, na.rm = TRUE), 3),
+    `Desv. Est. (%)` = round(sd(retorno, na.rm = TRUE), 3),
+    `VaR 95% (%)`    = round(quantile(retorno, 0.05, na.rm = TRUE), 3),
+    `Días pos. (%)`  = round(sum(retorno > 0, na.rm = TRUE) / n() * 100, 1)
+  ) |>
+  arrange(desc(`Ret. Medio (%)`))
+
+kable(tabla_riesgo,
+      caption = "Métricas de retorno y riesgo — últimos 365 días",
+      booktabs = TRUE) |>
+  kable_styling(bootstrap_options = c("striped","hover"), full_width = TRUE) |>
+  column_spec(4, color = ifelse(tabla_riesgo$`VaR 95% (%)` < -3, "red", "black"))
+```
+
+El **VaR 95%** representa la pérdida máxima esperada en el 5% de los peores días históricos. Un valor de -5% indica que en el 5% de los días más adversos, la pérdida fue de al menos 5%.
+
+---
+
+# Análisis de Correlaciones {#correlaciones}
+
+## Matriz de Correlación (Pearson)
+
+```{r heatmap-corr, fig.cap="Mapa de calor de correlaciones de Pearson entre retornos diarios (últimos 365 días)"}
+df_wide <- df_365 |>
+  select(fecha, simbolo, retorno) |>
+  pivot_wider(names_from = simbolo, values_from = retorno) |>
+  select(-fecha)
+
+mat_cor <- cor(df_wide, use = "complete.obs", method = "pearson")
+
+df_cor_long <- as.data.frame(as.table(mat_cor)) |>
+  rename(Var1 = Var1, Var2 = Var2, Corr = Freq)
+
+ggplot(df_cor_long, aes(x = Var1, y = Var2, fill = Corr)) +
+  geom_tile(color = "white", linewidth = 0.4) +
+  geom_text(aes(label = round(Corr, 2)), size = 3, color = "black") +
+  scale_fill_gradient2(low = "#3498db", mid = "white", high = "#e74c3c",
+                       midpoint = 0, limits = c(-1, 1), name = "Pearson r") +
+  labs(title = "Matriz de Correlación — Retornos Diarios (Pearson)",
+       x = NULL, y = NULL) +
+  theme_minimal(base_size = 11) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## Scatter BTC vs ETH
+
+```{r scatter-corr, fig.cap="Diagrama de dispersión BTC vs ETH — retornos diarios"}
+df_scatter <- df_365 |>
+  filter(simbolo %in% c("BTC", "ETH")) |>
+  select(fecha, simbolo, retorno) |>
+  pivot_wider(names_from = simbolo, values_from = retorno) |>
+  drop_na()
+
+ggplot(df_scatter, aes(x = BTC, y = ETH)) +
+  geom_point(alpha = 0.4, color = "#627EEA", size = 1.5) +
+  geom_smooth(method = "lm", se = TRUE, color = "#e94560", linewidth = 1) +
+  labs(title = "Retornos Diarios: BTC vs ETH",
+       x = "Retorno BTC (%)", y = "Retorno ETH (%)") +
+  theme_minimal(base_size = 12)
+```
+
+---
+
+# Comparador de Rendimiento {#comparador}
+
+## Rendimiento Acumulado (Base 100)
+
+```{r comparador, fig.cap="Rendimiento acumulado normalizado en base 100 (desde el inicio del período)"}
+df_comp <- hist_data |>
+  filter(fecha >= max(fecha) - 365) |>
+  arrange(fecha) |>
+  group_by(simbolo) |>
+  mutate(ini = first(close), norm = close / ini * 100) |>
+  ungroup()
+
+ggplot(df_comp, aes(x = fecha, y = norm, color = simbolo)) +
+  geom_line(linewidth = 0.8, alpha = 0.9) +
+  geom_hline(yintercept = 100, linetype = "dashed", color = "gray50") +
+  scale_color_manual(values = COLOR_PALETTE) +
+  labs(title = "Rendimiento Acumulado — Base 100 (últimos 365 días)",
+       x = NULL, y = "Índice (base = 100)", color = "Moneda") +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "right")
+```
+
+## Tabla Comparativa de Rendimiento
+
+```{r tabla-comp}
+tabla_comp <- hist_data |>
+  filter(fecha >= max(fecha) - 365) |>
+  group_by(simbolo) |>
+  summarise(
+    `P. Inicial ($)` = round(first(close), 4),
+    `P. Final ($)`   = round(last(close), 4),
+    `Rend. (%)`      = round((last(close) - first(close)) / first(close) * 100, 2),
+    `Vol. (%)`       = round(sd(retorno, na.rm = TRUE), 3)
+  ) |>
+  arrange(desc(`Rend. (%)`))
+
+kable(tabla_comp,
+      caption = "Comparativa de rendimiento — últimos 365 días",
+      booktabs = TRUE) |>
+  kable_styling(bootstrap_options = c("striped","hover"), full_width = TRUE) |>
+  column_spec(4, color = ifelse(tabla_comp$`Rend. (%)` >= 0, "#2ecc71", "#e74c3c"),
+              bold = TRUE)
+```
+
+---
+
+# Análisis EDA Orientado al Modelo {#eda-modelo}
+
+## Boxplot Mensual de Retornos — BTC
+
+```{r boxplot-mensual, fig.cap="Boxplot mensual de retornos diarios de BTC"}
+df_btc_mes <- df_btc |>
+  mutate(mes = floor_date(fecha, "month"),
+         mes_label = format(mes, "%b %Y"))
+
+ggplot(df_btc_mes, aes(x = reorder(mes_label, mes), y = retorno)) +
+  geom_boxplot(fill = "#3498db", alpha = 0.7, outlier.size = 1) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray40") +
+  labs(title = "Retornos Diarios de BTC por Mes",
+       x = NULL, y = "Retorno (%)") +
+  theme_minimal(base_size = 11) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 7))
+```
+
+## Funciones ACF y PACF
+
+Las funciones de autocorrelación son fundamentales para identificar los órdenes del modelo ARIMA:
+
+- **ACF** (Autocorrelation Function): indica el orden **q** del componente MA.
+- **PACF** (Partial Autocorrelation Function): indica el orden **p** del componente AR.
+
+```{r acf-pacf, fig.cap="ACF y PACF de los retornos diarios de BTC", fig.height=4}
+serie_btc <- na.omit(df_btc$retorno)
+ci_val <- qnorm(0.975) / sqrt(length(serie_btc))
+
+acf_r  <- acf(serie_btc,  plot = FALSE, lag.max = 40)
+pacf_r <- pacf(serie_btc, plot = FALSE, lag.max = 40)
+
+df_acf  <- data.frame(Lag = as.numeric(acf_r$lag[-1]),  ACF  = as.numeric(acf_r$acf[-1]))
+df_pacf <- data.frame(Lag = as.numeric(pacf_r$lag),     PACF = as.numeric(pacf_r$acf))
+
+p_acf <- ggplot(df_acf, aes(x = Lag, y = ACF)) +
+  geom_bar(stat = "identity", fill = "#3498db", alpha = 0.7) +
+  geom_hline(yintercept = c(ci_val, -ci_val), linetype = "dashed", color = "blue", linewidth = 0.7) +
+  labs(title = "ACF — Retornos BTC") + theme_minimal(base_size = 11)
+
+p_pacf <- ggplot(df_pacf, aes(x = Lag, y = PACF)) +
+  geom_bar(stat = "identity", fill = "#e74c3c", alpha = 0.7) +
+  geom_hline(yintercept = c(ci_val, -ci_val), linetype = "dashed", color = "blue", linewidth = 0.7) +
+  labs(title = "PACF — Retornos BTC") + theme_minimal(base_size = 11)
+
+gridExtra::grid.arrange(p_acf, p_pacf, ncol = 2)
+```
+
+## Estadísticas Descriptivas
+
+```{r stats-desc}
+stats_desc <- hist_data |>
+  group_by(simbolo) |>
+  summarise(
+    n      = n(),
+    Media  = round(mean(close, na.rm = TRUE), 2),
+    Mediana= round(median(close, na.rm = TRUE), 2),
+    DS     = round(sd(close, na.rm = TRUE), 2),
+    Min    = round(min(close, na.rm = TRUE), 4),
+    Max    = round(max(close, na.rm = TRUE), 2),
+    IQR    = round(IQR(close, na.rm = TRUE), 2)
+  )
+
+kable(stats_desc,
+      caption = "Estadísticas descriptivas del precio de cierre por moneda",
+      booktabs = TRUE,
+      col.names = c("Símbolo","n","Media","Mediana","Desv. Est.","Mín.","Máx.","IQR")) |>
+  kable_styling(bootstrap_options = c("striped","hover","condensed"), full_width = TRUE)
+```
+
+## Test de Estacionariedad (ADF)
+
+La prueba **Augmented Dickey-Fuller (ADF)** contrasta la hipótesis nula de que la serie tiene una raíz unitaria (no es estacionaria):
+
+- **H₀**: la serie tiene raíz unitaria (no estacionaria)
+- **H₁**: la serie es estacionaria
+- Se rechaza H₀ si **p-valor < 0.05**
+
+```{r adf-test}
+test_stationarity <- function(serie) {
+  tryCatch({
+    test <- adf.test(na.omit(as.numeric(serie)), k = trunc((length(na.omit(serie)) - 1)^(1/3)))
+    list(
+      estadistico    = test$statistic,
+      p_valor        = test$p.value,
+      es_estacionaria = test$p.value < 0.05,
+      conclusion     = ifelse(test$p.value < 0.05,
+                              "Serie estacionaria (rechaza H₀)",
+                              "Serie NO estacionaria (no rechaza H₀)")
+    )
+  }, error = function(e) list(estadistico=NA, p_valor=NA, es_estacionaria=FALSE, conclusion="Error"))
+}
+
+adf_resultados <- lapply(unique(hist_data$simbolo), function(cr) {
+  serie <- na.omit(hist_data[hist_data$simbolo == cr, "retorno"][[1]])
+  res   <- test_stationarity(serie)
+  data.frame(
+    Moneda        = cr,
+    `ADF Stat.`   = round(res$estadistico, 4),
+    `p-valor`     = round(res$p_valor, 6),
+    Estacionaria  = ifelse(res$es_estacionaria, "✅ Sí", "❌ No"),
+    `d recomendado` = ifelse(res$es_estacionaria, 0, 1)
+  )
+}) |> bind_rows()
+
+kable(adf_resultados,
+      caption = "Resultados del Test ADF para retornos diarios por criptomoneda",
+      booktabs = TRUE,
+      row.names = FALSE) |>
+  kable_styling(bootstrap_options = c("striped","hover"), full_width = TRUE)
+```
+
+## Descomposición STL — BTC
+
+La descomposición STL (Seasonal and Trend decomposition using Loess) separa la serie en:
+
+<div class="formula-box">
+Y(t) = T(t) + S(t) + R(t)
+
+Donde: **T(t)** = Tendencia · **S(t)** = Estacionalidad · **R(t)** = Residuo
+</div>
+
+```{r stl, fig.cap="Descomposición STL de los retornos de BTC (frecuencia semanal)", fig.height=7}
+serie_stl <- ts(na.omit(df_btc$retorno), frequency = 7)
+decomp    <- stl(serie_stl, s.window = "periodic", robust = TRUE)
+
+autoplot(decomp) +
+  labs(title = "Descomposición STL — Retornos BTC") +
+  theme_minimal(base_size = 12)
+```
+
+---
+
+# Modelado ARIMA {#arima}
+
+## Marco Teórico
+
+El modelo **ARIMA(p, d, q)** combina tres componentes:
+
+| Componente | Símbolo | Descripción |
+|---|---|---|
+| Autoregresivo | AR(p) | Dependencia en p rezagos pasados |
+| Integrado | I(d) | Diferenciación para estacionariedad |
+| Media Móvil | MA(q) | Dependencia en q errores pasados |
+
+<div class="formula-box">
+**Ecuación general:**  
+φ(B)(1−B)ᵈ yₜ = θ(B) εₜ
+
+Donde B es el operador de rezago, φ(B) el polinomio AR, θ(B) el polinomio MA y εₜ ruido blanco.
+</div>
+
+## Función: Detección de Estacionariedad
+
+```{r detect-stationarity}
+detect_stationarity_and_differentiate <- function(serie, max_d = 2) {
+  serie_clean <- as.numeric(na.omit(serie))
+  d_val <- 0
+  current <- serie_clean
+
+  for (i in seq_len(max_d)) {
+    tryCatch({
+      test <- adf.test(current, k = trunc((length(current)-1)^(1/3)))
+      if (test$p.value < 0.05) break
+      d_val    <- i
+      current  <- diff(current)
+    }, error = function(e) break)
+  }
+  list(is_stationary = d_val == 0, d_value = d_val)
+}
+```
+
+## Ajuste del Mejor Modelo — BTC
+
+```{r arima-ajuste, cache=TRUE}
+set.seed(42)
+df_btc_clean <- hist_data |>
+  filter(simbolo == "BTC") |>
+  arrange(fecha) |>
+  handle_missing(method = "interpolation")
+
+serie_full  <- na.omit(df_btc_clean$close)
+n           <- length(serie_full)
+n_train     <- floor(n * 0.8)
+train       <- serie_full[1:n_train]
+test        <- serie_full[(n_train + 1):n]
+fechas_all  <- df_btc_clean$fecha[!is.na(df_btc_clean$close)]
+train_dates <- fechas_all[1:n_train]
+test_dates  <- fechas_all[(n_train + 1):n]
+
+# Detectar d óptimo
+stat_res  <- detect_stationarity_and_differentiate(train)
+d_opt     <- stat_res$d_value
+cat("d óptimo detectado:", d_opt, "\n")
+
+# Búsqueda de mejor (p, q) por AIC
+pq_rng    <- 0:3
+best_aic  <- Inf
+best_order <- c(1, d_opt, 1)
+best_model <- NULL
+results   <- list()
+
+for (p in pq_rng) {
+  for (q in pq_rng) {
+    if (p == 0 && d_opt == 0 && q == 0) next
+    tryCatch({
+      m   <- Arima(train, order = c(p, d_opt, q), method = "ML")
+      aic <- AIC(m)
+      results[[length(results)+1]] <- data.frame(p=p, d=d_opt, q=q, AIC=round(aic,2))
+      if (aic < best_aic) { best_aic <- aic; best_order <- c(p, d_opt, q); best_model <- m }
+    }, error = function(e) {})
+  }
+}
+
+cat(sprintf("Mejor modelo: ARIMA(%d,%d,%d) — AIC = %.2f\n",
+            best_order[1], best_order[2], best_order[3], best_aic))
+```
+
+## Top Modelos por AIC
+
+```{r top-modelos}
+df_results <- bind_rows(results) |>
+  arrange(AIC) |>
+  head(10) |>
+  mutate(Modelo = paste0("ARIMA(", p, ",", d, ",", q, ")")) |>
+  select(Modelo, AIC)
+
+kable(df_results,
+      caption = "Top 10 modelos ARIMA por criterio AIC — BTC precio de cierre",
+      booktabs = TRUE) |>
+  kable_styling(bootstrap_options = c("striped","hover"), full_width = FALSE) |>
+  row_spec(1, bold = TRUE, background = "#d5f0e0")
+```
+
+## Diagnóstico de Residuos
+
+```{r diagnostico-residuos, fig.cap="Diagnóstico de residuos del mejor modelo ARIMA", fig.height=5}
+resid_model <- residuals(best_model)
+
+p1 <- ggplot(data.frame(x = 1:length(resid_model), y = resid_model),
+             aes(x = x, y = y)) +
+  geom_line(color = "#3498db", linewidth = 0.5) +
+  labs(title = "Residuos en el tiempo", x = "Índice", y = "Residuo") +
+  theme_minimal(base_size = 11)
+
+p2 <- ggplot(data.frame(x = resid_model), aes(x = x)) +
+  geom_histogram(bins = 40, fill = "#627EEA", alpha = 0.8, color = "white") +
+  labs(title = "Distribución de Residuos", x = "Residuo", y = "Frecuencia") +
+  theme_minimal(base_size = 11)
+
+gridExtra::grid.arrange(p1, p2, ncol = 2)
+```
+
+```{r tests-residuos}
+# Test de normalidad (Shapiro-Wilk)
+sw_test <- if (length(resid_model) > 5000)
+  shapiro.test(sample(resid_model, 5000)) else shapiro.test(resid_model)
+
+# Test de independencia (Ljung-Box)
+lb_test <- Box.test(resid_model, lag = 10, type = "Ljung-Box")
+
+tests_df <- data.frame(
+  Test         = c("Shapiro-Wilk (Normalidad)", "Ljung-Box (Independencia)"),
+  `p-valor`    = round(c(sw_test$p.value, lb_test$p.value), 6),
+  Conclusión   = c(
+    ifelse(sw_test$p.value > 0.05, "✅ Residuos normales", "⚠️ No normales"),
+    ifelse(lb_test$p.value > 0.05, "✅ Residuos independientes", "⚠️ Autocorrelación presente")
+  )
+)
+
+kable(tests_df,
+      caption = "Tests sobre los residuos del mejor modelo ARIMA",
+      booktabs = TRUE) |>
+  kable_styling(bootstrap_options = c("striped","hover"), full_width = FALSE)
+```
+
+## Forecast y Métricas de Error
+
+```{r forecast-plot, fig.cap="Predicción ARIMA sobre el conjunto de test — BTC (precio de cierre)"}
+horizonte <- length(test)
+fc        <- forecast(best_model, h = horizonte)
+pred      <- as.numeric(fc$mean)
+
+# Métricas
+mae  <- mean(abs(pred - test))
+rmse <- sqrt(mean((pred - test)^2))
+mape <- mean(abs((pred - test) / test)) * 100
+r2   <- cor(pred, test)^2
+
+metricas <- data.frame(
+  Métrica = c("MAE (USD)", "RMSE (USD)", "MAPE (%)", "R²"),
+  Valor   = round(c(mae, rmse, mape, r2), 4)
+)
+kable(metricas,
+      caption = sprintf("Métricas de error — ARIMA(%d,%d,%d) en conjunto de test",
+                        best_order[1], best_order[2], best_order[3]),
+      booktabs = TRUE) |>
+  kable_styling(bootstrap_options = c("striped","hover"), full_width = FALSE)
+```
+
+```{r forecast-grafico, fig.cap="Ajuste del modelo ARIMA vs valores reales (BTC)"}
+n_hist <- min(200, length(train))
+df_forecast <- bind_rows(
+  data.frame(Fecha = tail(train_dates, n_hist),
+             Precio = tail(train, n_hist), Tipo = "Entrenamiento"),
+  data.frame(Fecha = test_dates[1:horizonte],
+             Precio = test[1:horizonte],  Tipo = "Test Real"),
+  data.frame(Fecha = test_dates[1:horizonte],
+             Precio = pred,               Tipo = "Predicción"),
+  data.frame(Fecha = test_dates[1:horizonte],
+             Precio = as.numeric(fc$lower[,2]), Tipo = "IC 95% Inferior"),
+  data.frame(Fecha = test_dates[1:horizonte],
+             Precio = as.numeric(fc$upper[,2]), Tipo = "IC 95% Superior")
+)
+
+df_ribbon <- data.frame(
+  Fecha = test_dates[1:horizonte],
+  Lower = as.numeric(fc$lower[,2]),
+  Upper = as.numeric(fc$upper[,2])
+)
+
+df_lines <- df_forecast |> filter(Tipo %in% c("Entrenamiento","Test Real","Predicción"))
+
+ggplot() +
+  geom_ribbon(data = df_ribbon, aes(x = Fecha, ymin = Lower, ymax = Upper),
+              fill = "#3498db", alpha = 0.2) +
+  geom_line(data = df_lines, aes(x = Fecha, y = Precio, color = Tipo, linewidth = Tipo)) +
+  scale_color_manual(values = c(
+    "Entrenamiento" = "#2c3e50",
+    "Test Real"     = "#3498db",
+    "Predicción"    = "#e74c3c"
+  )) +
+  scale_linewidth_manual(values = c(
+    "Entrenamiento" = 0.7, "Test Real" = 0.9, "Predicción" = 1.1
+  )) +
+  scale_y_continuous(labels = dollar) +
+  labs(
+    title    = sprintf("ARIMA(%d,%d,%d) — Predicción vs Realidad — BTC",
+                       best_order[1], best_order[2], best_order[3]),
+    subtitle = sprintf("MAE: $%.0f | RMSE: $%.0f | MAPE: %.2f%% | R²: %.4f",
+                       mae, rmse, mape, r2),
+    x = NULL, y = "Precio (USD)",
+    color = NULL, linewidth = NULL
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(legend.position = "bottom")
+```
+
+---
+
+# Predicción Óptima {#prediccion-optima}
+
+## Búsqueda Automática del Mejor Modelo
+
+```{r mejor-modelo, cache=TRUE}
+# Usar los 1000 días más recientes, predicción 30 días
+n_pred_train <- min(1000, floor(n * 0.85))
+train_opt    <- serie_full[1:n_pred_train]
+train_dates_opt <- fechas_all[1:n_pred_train]
+horizonte_opt   <- 30
+
+stat_opt <- detect_stationarity_and_differentiate(train_opt)
+d_opt2   <- stat_opt$d_value
+
+best_bic  <- Inf
+best_ord2 <- c(1, d_opt2, 1)
+best_mod2 <- NULL
+
+for (p in 0:3) {
+  for (q in 0:3) {
+    if (p == 0 && d_opt2 == 0 && q == 0) next
+    tryCatch({
+      m   <- Arima(train_opt, order = c(p, d_opt2, q), method = "ML")
+      b   <- BIC(m)
+      if (b < best_bic) { best_bic <- b; best_ord2 <- c(p, d_opt2, q); best_mod2 <- m }
+    }, error = function(e) {})
+  }
+}
+
+cat(sprintf("Mejor modelo (BIC): ARIMA(%d,%d,%d) — BIC = %.2f\n",
+            best_ord2[1], best_ord2[2], best_ord2[3], best_bic))
+```
+
+## Predicción a 30 Días
+
+```{r pred-30dias, fig.cap="Predicción óptima a 30 días para BTC con intervalos de confianza"}
+fc_opt  <- forecast(best_mod2, h = horizonte_opt)
+last_d  <- tail(train_dates_opt, 1)
+pred_dates <- seq(last_d + 1, by = "day", length.out = horizonte_opt)
+
+df_pred_opt <- data.frame(
+  Fecha      = pred_dates,
+  Prediccion = as.numeric(fc_opt$mean),
+  Lower_80   = as.numeric(fc_opt$lower[,1]),
+  Upper_80   = as.numeric(fc_opt$upper[,1]),
+  Lower_95   = as.numeric(fc_opt$lower[,2]),
+  Upper_95   = as.numeric(fc_opt$upper[,2])
+)
+
+n_ctx <- min(120, length(train_opt))
+df_ctx <- data.frame(
+  Fecha  = tail(train_dates_opt, n_ctx),
+  Precio = tail(train_opt, n_ctx)
+)
+
+ggplot() +
+  geom_line(data = df_ctx, aes(x = Fecha, y = Precio), color = "#2c3e50", linewidth = 0.8) +
+  geom_ribbon(data = df_pred_opt,
+              aes(x = Fecha, ymin = Lower_95, ymax = Upper_95), fill = "#3498db", alpha = 0.18) +
+  geom_ribbon(data = df_pred_opt,
+              aes(x = Fecha, ymin = Lower_80, ymax = Upper_80), fill = "#3498db", alpha = 0.28) +
+  geom_line(data = df_pred_opt, aes(x = Fecha, y = Prediccion),
+            color = "#e74c3c", linewidth = 1.1) +
+  scale_y_continuous(labels = dollar) +
+  labs(
+    title    = sprintf("Predicción Óptima 30 días — BTC | ARIMA(%d,%d,%d) por BIC",
+                       best_ord2[1], best_ord2[2], best_ord2[3]),
+    subtitle = "Azul: IC 80% y 95% | Rojo: Predicción puntual | Gris: Historial",
+    x = NULL, y = "Precio (USD)"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+## Tabla de Predicciones
+
+```{r tabla-predicciones}
+df_pred_opt |>
+  mutate(
+    Fecha      = format(Fecha, "%d/%m/%Y"),
+    Prediccion = dollar(Prediccion, accuracy = 1),
+    `IC 80%`   = paste0(dollar(Lower_80, accuracy=1), " — ", dollar(Upper_80, accuracy=1)),
+    `IC 95%`   = paste0(dollar(Lower_95, accuracy=1), " — ", dollar(Upper_95, accuracy=1))
+  ) |>
+  select(Fecha, Prediccion, `IC 80%`, `IC 95%`) |>
+  kable(caption = "Predicciones diarias a 30 días con intervalos de confianza",
+        booktabs = TRUE, row.names = FALSE) |>
+  kable_styling(bootstrap_options = c("striped","hover","condensed"),
+                full_width = TRUE) |>
+  scroll_box(height = "400px")
+```
+
+---
+
+# Arquitectura del Dashboard {#arquitectura}
+
+## Estructura del Proyecto
+
+```
+Crypto_EDA_App/
+├── global.R      # Librerías, config API, funciones, carga de datos
+├── ui.R          # Interfaz (shinydashboard): 10 pestañas
+├── server.R      # Lógica reactiva y renderizado de gráficos
+├── README.md     # Documentación
+└── www/
+    └── crypto.svg
+```
+
+## Módulos del Dashboard
+
+```{r modulos-tabla}
+modulos <- tibble(
+  Pestaña    = c("Introducción","Visión General","Precios","Retornos & Riesgo",
+                 "Correlaciones","Comparador","Análisis EDA","Modelo ARIMA",
+                 "Predicción Óptima","Valores Faltantes"),
+  Contenido  = c(
+    "Hero banner, value boxes, tarjetas de monedas, objetivo, equipo",
+    "Precios spot, cap. de mercado, volumen 24h en tiempo real",
+    "Boxplot, serie temporal, candlestick (60 días), Bandas de Bollinger",
+    "Boxplot retornos, histograma, volatilidad rodante 30d, VaR 95%",
+    "Heatmap Pearson/Spearman, scatter entre pares seleccionables",
+    "Rendimiento acumulado normalizado base 100 o %, tabla comparativa",
+    "Boxplot, ACF, PACF, test ADF, descomposición STL, estadísticas",
+    "Búsqueda automática ARIMA (AIC/BIC/HQIC), rolling/directo, diagnóstico",
+    "Mejor modelo automático, predicción a N días, IC 80% y 95%",
+    "Resumen NAs, heatmap, imputación (interpolación / media / eliminar)"
+  )
+)
+
+kable(modulos, caption = "Módulos del Crypto EDA Dashboard",
+      booktabs = TRUE) |>
+  kable_styling(bootstrap_options = c("striped","hover"), full_width = TRUE) |>
+  column_spec(1, bold = TRUE, width = "2.5cm") |>
+  column_spec(2, width = "12cm")
+```
+
+## Funciones Principales
+
+```{r funciones-tabla}
+funciones <- tibble(
+  Función = c(
+    "get_historical_daily()",
+    "get_price_overview()",
+    "calculate_bollinger_bands()",
+    "handle_missing()",
+    "missing_summary()",
+    "perform_stl_decomposition_safe()",
+    "detect_stationarity_and_differentiate()",
+    "get_best_model_for_prediction()",
+    "analyze_residuals()"
+  ),
+  Archivo   = c("global.R","global.R","global.R","global.R","global.R",
+                "global.R","global.R","global.R","global.R"),
+  Descripción = c(
+    "Descarga OHLCV histórico de CryptoCompare (hasta 1905 días)",
+    "Obtiene precio spot, cap. de mercado y volumen 24h en tiempo real",
+    "Calcula SMA, banda superior e inferior dados window y k",
+    "Imputa NAs: interpolación lineal, media global o eliminación",
+    "Devuelve tabla de variables con NAs y su porcentaje",
+    "Descomposición STL robusta; maneja series cortas con fallback",
+    "Aplica test ADF iterativo para determinar el orden d óptimo",
+    "Busca el mejor ARIMA(p,d,q) por AIC/BIC/HQIC sobre el conjunto de entrenamiento",
+    "Ejecuta tests Shapiro-Wilk y Ljung-Box sobre los residuos del modelo"
+  )
+)
+
+kable(funciones, caption = "Funciones principales definidas en global.R",
+      booktabs = TRUE) |>
+  kable_styling(bootstrap_options = c("striped","hover","condensed"),
+                full_width = TRUE, font_size = 11) |>
+  column_spec(1, bold = TRUE, monospace = TRUE, width = "4.5cm") |>
+  column_spec(2, width = "2cm") |>
+  column_spec(3, width = "9cm")
+```
+
+## Dependencias
+
+```{r deps-tabla}
+deps <- tibble(
+  Librería   = c("shiny","shinydashboard","tidyverse","plotly","DT",
+                 "httr","jsonlite","zoo","forecast","tseries",
+                 "lubridate","scales","rsconnect"),
+  Uso        = c(
+    "Framework reactivo de la app",
+    "Layout tipo dashboard con sidebar y pestañas",
+    "Manipulación y transformación de datos",
+    "Gráficos interactivos con animaciones y tooltips",
+    "Tablas interactivas con filtros y paginación",
+    "Conexión HTTP a la API REST de CryptoCompare",
+    "Parseo de respuestas JSON de la API",
+    "Medias móviles, rollmean, rollapply, na.approx",
+    "auto.arima(), Arima(), forecast(), ACF/PACF",
+    "Test Augmented Dickey-Fuller (adf.test)",
+    "Manipulación de fechas (floor_date, as_date)",
+    "Formato de ejes y etiquetas (dollar, percent)",
+    "Publicación en shinyapps.io"
+  )
+)
+
+kable(deps, caption = "Dependencias del proyecto",
+      booktabs = TRUE) |>
+  kable_styling(bootstrap_options = c("striped","hover","condensed"),
+                full_width = TRUE, font_size = 11) |>
+  column_spec(1, bold = TRUE, monospace = TRUE)
+```
+
+---
+
+# Ecuaciones y Marco Matemático {#ecuaciones}
+
+## Resumen de Fórmulas
+
+| Concepto | Fórmula |
+|---|---|
+| Retorno simple | $r_t = \frac{P_t - P_{t-1}}{P_{t-1}} \times 100$ |
+| Retorno logarítmico | $r_t^{log} = \ln\left(\frac{P_t}{P_{t-1}}\right) \times 100$ |
+| Volatilidad diaria | $v_t = \frac{High_t - Low_t}{Open_t} \times 100$ |
+| SMA | $SMA_n = \frac{1}{n}\sum_{i=0}^{n-1} P_{t-i}$ |
+| Banda de Bollinger | $BB_{\pm} = SMA_n \pm k \cdot \sigma_n$ |
+| Ancho de banda | $\%Bw = \frac{BB_{+} - BB_{-}}{SMA_n} \times 100$ |
+| VaR 95% | $VaR_{95\%} = Q_{0.05}(r_t)$ |
+| Volatilidad rodante | $\sigma_{30} = \sqrt{\frac{1}{29}\sum_{i=0}^{29}(r_{t-i} - \bar{r})^2}$ |
+| Descomposición STL | $Y(t) = T(t) + S(t) + R(t)$ |
+| Modelo ARIMA(p,d,q) | $\phi(B)(1-B)^d y_t = \theta(B)\varepsilon_t$ |
+
+---
+
+# Conclusiones y Próximos Pasos {#conclusiones}
+
+## Hallazgos Principales
+
+1. **Heterogeneidad de precios**: el rango de precios entre las 10 criptomonedas abarca varios órdenes de magnitud (de \$0.10 en DOGE a más de \$50,000 en BTC), lo que hace necesario el uso de escala logarítmica en las comparativas.
+
+2. **Distribución de retornos**: todos los activos muestran colas pesadas (fat tails) y ligera asimetría, comportamiento típico de activos financieros de alto riesgo. Las stablecoins (USDC, USDT, USD1) presentan retornos casi nulos con muy baja varianza.
+
+3. **Correlaciones**: BTC y ETH muestran alta correlación positiva (~0.7–0.8 en períodos recientes), mientras que las stablecoins presentan correlación cercana a cero con el resto del mercado.
+
+4. **Estacionariedad**: los *precios* de cierre son no-estacionarios (no rechazan H₀ en ADF), mientras que los *retornos diarios* sí son estacionarios en la mayoría de los activos, confirmando que d=1 es el orden adecuado para modelar precios.
+
+5. **Modelo ARIMA**: se identificó automáticamente el mejor orden (p, d, q) por criterio AIC/BIC para cada activo. Los modelos exhiben residuos con baja autocorrelación (Ljung-Box no significativo), aunque la no-normalidad de los residuos sugiere la posibilidad de mejorar con modelos GARCH o variantes con distribución t-Student.
+
+## Próximos Pasos
+
+- **Modelos GARCH**: capturar la heterocedasticidad condicional (agrupamiento de volatilidad) presente en las series de criptomonedas.
+- **Validación walk-forward**: rolling forecast con ventana expandible para evaluación robusta fuera de muestra.
+- **Modelos multivariados**: VAR / VECM para explotar las correlaciones entre activos en la predicción.
+- **Redes neuronales**: comparar ARIMA con LSTM y Prophet para series temporales financieras.
+- **Intervalos de predicción calibrados**: mejorar la cobertura empírica de los IC mediante bootstrapping.
+
+---
+
+# Información del Proyecto {#info}
+
+## Equipo
+
+| Integrante | Programa | GitHub |
+|---|---|---|
+| **Mateo Barrios** | Ciencia de Datos | [Mateo3008](https://github.com/Mateo3008/Crypto_EDA_App) |
+| **Rafael Romero** | Ciencia de Datos | [rafaelromero06](https://github.com/rafaelromero06) |
+
+## Cómo Reproducir Este Documento
+
+```r
+# 1. Instalar dependencias
+install.packages(c(
+  "bookdown", "tidyverse", "plotly", "DT", "lubridate",
+  "scales", "jsonlite", "httr", "zoo", "forecast", "tseries",
+  "knitr", "kableExtra", "gridExtra"
+))
+
+# 2. Renderizar
+bookdown::render_book("Crypto_EDA_Bookdown.Rmd", "bookdown::html_document2")
+
+# O con rmarkdown directamente:
+rmarkdown::render("Crypto_EDA_Bookdown.Rmd")
+```
+
+## Fuentes
+
+- **Datos**: [CryptoCompare API](https://min-api.cryptocompare.com/)
+- **Framework**: [R Shiny](https://shiny.posit.co/) + [shinydashboard](https://rstudio.github.io/shinydashboard/)
+- **Despliegue**: [shinyapps.io](https://www.shinyapps.io/)
+- **Repositorio**: [github.com/Mateo3008/Crypto_EDA_App](https://github.com/Mateo3008/Crypto_EDA_App)
+
+---
+
+```{r session-info, echo=FALSE}
+cat("Sesión R generada el", format(Sys.time(), "%d/%m/%Y %H:%M"), "\n")
+sessionInfo()
+```
