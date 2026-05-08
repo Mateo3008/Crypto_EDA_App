@@ -9,8 +9,6 @@ Mateo Barrios · Rafael Romero — Proyecto Académico 2026
 
 Dashboard interactivo que consume datos en tiempo real de la API de [CryptoCompare](https://min-api.cryptocompare.com/) para analizar el comportamiento histórico de 10 criptomonedas. El análisis cubre desde la exploración y limpieza de datos hasta el ajuste, validación y predicción con modelos **ARIMA(p, d, q)**.
 
-El diseño sigue un estilo fintech profesional inspirado en Bloomberg Terminal y TradingView: glassmorphism, tema claro/oscuro, animaciones de trazado progresivo en los gráficos y un overlay de carga con mensajes contextuales.
-
 **Monedas analizadas:** BTC · ETH · USDC · SOL · XRP · TAO · USDT · DOGE · USD1 · ZEC
 
 ---
