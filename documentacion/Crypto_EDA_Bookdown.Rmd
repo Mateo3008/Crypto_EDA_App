@@ -79,7 +79,7 @@ El análisis está orientado hacia la construcción de un **modelo predictivo de
 <div class="callout-box">
 **Repositorio:** [https://github.com/Mateo3008/Crypto_EDA_App](https://github.com/Mateo3008/Crypto_EDA_App)  
 **Framework:** R Shiny + shinydashboard  
-**Fuente de datos:** CryptoCompare API (OHLCV diario, ~1905 días por moneda)
+**Fuente de datos:** CryptoCompare API  diario, ~1905 días por moneda)
 </div>
 
 ## Criptomonedas Analizadas
