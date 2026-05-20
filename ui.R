@@ -4,7 +4,7 @@ library(shinydashboard)
 library(plotly)
 library(DT)
 
-# Lista de las 10 criptomonedas 
+CRYPTOS <- c(
   "Bitcoin"   = "BTC",
   "Ethereum"  = "ETH",
   "USD Coin"  = "USDC",

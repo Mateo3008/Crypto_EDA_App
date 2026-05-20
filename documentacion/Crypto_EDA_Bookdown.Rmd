@@ -450,23 +450,6 @@ ggplot(df_btc, aes(x = fecha, y = close)) +
   theme_minimal(base_size = 12)
 ```
 
-## Candlestick — Últimos 60 días (BTC)
-
-```{r candlestick, fig.cap="Gráfico de velas japonesas — BTC, últimos 60 días"}
-df_candle <- df_btc |> tail(60)
-
-plot_ly(df_candle, x = ~fecha, type = "candlestick",
-        open  = ~open,  close = ~close,
-        high  = ~high,  low   = ~low,
-        increasing = list(line = list(color = "#2ecc71")),
-        decreasing = list(line = list(color = "#e74c3c"))) |>
-  layout(title  = "BTC — Últimas 60 Velas Diarias",
-         xaxis  = list(title = ""),
-         yaxis  = list(title = "Precio (USD)"),
-         paper_bgcolor = "white",
-         plot_bgcolor  = "white")
-```
-
 ## Bandas de Bollinger
 
 Las Bandas de Bollinger son un indicador de volatilidad que envuelve el precio alrededor de una media móvil simple (SMA).
@@ -1138,7 +1121,7 @@ df_pred_opt |>
 
 ## Código de la Aplicación
 
-El dashboard se construye con `shinydashboard` y se estructura en 10 pestañas, cada una mostrando diferentes aspectos del análisis. Los siguientes bloques de código (`ui.R` y `server.R`) deben ser guardados en archivos separados para ejecutar la aplicación Shiny completa, o se pueden integrar aquí para un despliegue local.
+El dashboard se construye con `shinydashboard` y se estructura en 9 pestañas, cada una mostrando diferentes aspectos del análisis. Los siguientes bloques de código (`ui.R` y `server.R`) deben ser guardados en archivos separados para ejecutar la aplicación Shiny completa, o se pueden integrar aquí para un despliegue local.
 
 ### UI (`ui.R`)
 
@@ -1155,16 +1138,16 @@ ui <- dashboardPage(
   dashboardHeader(title = "Crypto EDA Dashboard", titleWidth = 300),
   dashboardSidebar(
     sidebarMenu(
-      menuItem("Introducción", tabName = "intro", icon = icon("info-circle")),
-      menuItem("Visión General", tabName = "overview", icon = icon("chart-line")),
-      menuItem("Precios", tabName = "prices", icon = icon("bitcoin")),
-      menuItem("Retornos y Riesgo", tabName = "returns", icon = icon("chart-pie")),
-      menuItem("Correlaciones", tabName = "correlations", icon = icon("project-diagram")),
-      menuItem("Comparador", tabName = "comparator", icon = icon("exchange-alt")),
-      menuItem("Análisis EDA", tabName = "eda_model", icon = icon("chart-bar")),
-      menuItem("Modelo ARIMA", tabName = "arima", icon = icon("chart-line")),
-      menuItem("Predicción Óptima", tabName = "best_pred", icon = icon("chart-line")),
-      menuItem("Valores Faltantes", tabName = "missing", icon = icon("exclamation-triangle"))
+      menuItem("Introducción",      tabName = "intro",       icon = icon("info-circle")),
+      menuItem("Visión General",    tabName = "overview",    icon = icon("chart-line")),
+      menuItem("Precios",           tabName = "prices",      icon = icon("bitcoin")),
+      menuItem("Retornos y Riesgo", tabName = "returns",     icon = icon("chart-pie")),
+      menuItem("Correlaciones",     tabName = "correlations",icon = icon("project-diagram")),
+      menuItem("Comparador",        tabName = "comparator",  icon = icon("exchange-alt")),
+      menuItem("Análisis EDA",      tabName = "eda_model",   icon = icon("chart-bar")),
+      menuItem("Modelo ARIMA",      tabName = "arima",       icon = icon("chart-line")),
+      menuItem("Predicción Óptima", tabName = "best_pred",   icon = icon("chart-line")),
+      menuItem("Valores Faltantes", tabName = "missing",     icon = icon("exclamation-triangle"))
     )
   ),
   dashboardBody(
@@ -1177,12 +1160,15 @@ ui <- dashboardPage(
     tabItems(
       tabItem(tabName = "intro",
               fluidRow(
-                box(title = "Bienvenido al Crypto EDA Dashboard", status = "primary", solidHeader = TRUE, width = 12,
-                    "Este dashboard interactivo permite explorar datos históricos de 10 criptomonedas, realizar análisis de retornos y riesgo, y generar predicciones con modelos ARIMA."
+                box(title = "Bienvenido al Crypto EDA Dashboard", status = "primary",
+                    solidHeader = TRUE, width = 12,
+                    "Este dashboard interactivo permite explorar datos históricos de 10 criptomonedas,
+                     realizar análisis de retornos y riesgo, y generar predicciones con modelos ARIMA."
                 ),
                 box(title = "Equipo", status = "info", width = 6,
-                    "**Mateo Barrios** - Ciencia de Datos  \n",
-                    "**Rafael Romero** - Ciencia de Datos"
+                    "Mateo Barrios - Ciencia de Datos",
+                    br(),
+                    "Rafael Romero - Ciencia de Datos"
                 ),
                 box(title = "Criptomonedas Analizadas", status = "success", width = 6,
                     paste(names(CRYPTOS), collapse = ", ")
@@ -1197,7 +1183,7 @@ ui <- dashboardPage(
               ),
               fluidRow(
                 box(title = "Capitalización de Mercado", plotlyOutput("cap_plot"), width = 6),
-                box(title = "Volumen 24h", plotlyOutput("vol_plot"), width = 6)
+                box(title = "Volumen 24h",               plotlyOutput("vol_plot"), width = 6)
               ),
               fluidRow(
                 box(title = "Visión General", DTOutput("overview_table"), width = 12)
@@ -1206,10 +1192,7 @@ ui <- dashboardPage(
       tabItem(tabName = "prices",
               fluidRow(
                 box(title = "Distribución de Precios", plotlyOutput("price_boxplot"), width = 6),
-                box(title = "Serie Temporal BTC", plotlyOutput("btc_series"), width = 6)
-              ),
-              fluidRow(
-                box(title = "Candlestick BTC (60 días)", plotlyOutput("candlestick"), width = 12)
+                box(title = "Serie Temporal BTC",      plotlyOutput("btc_series"),    width = 6)
               ),
               fluidRow(
                 box(title = "Bandas de Bollinger BTC", plotlyOutput("bollinger"), width = 12)
@@ -1218,7 +1201,7 @@ ui <- dashboardPage(
       tabItem(tabName = "returns",
               fluidRow(
                 box(title = "Distribución de Retornos", plotlyOutput("ret_boxplot"), width = 6),
-                box(title = "Histograma BTC", plotlyOutput("hist_btc"), width = 6)
+                box(title = "Histograma BTC",           plotlyOutput("hist_btc"),    width = 6)
               ),
               fluidRow(
                 box(title = "Volatilidad Rodante BTC", plotlyOutput("vol_rolling"), width = 12)
@@ -1241,22 +1224,22 @@ ui <- dashboardPage(
       ),
       tabItem(tabName = "comparator",
               fluidRow(
-                box(title = "Rendimiento Acumulado", plotlyOutput("comp_plot"), width = 12)
+                box(title = "Rendimiento Acumulado", plotlyOutput("comp_plot"),  width = 12)
               ),
               fluidRow(
-                box(title = "Tabla Comparativa", DTOutput("comp_table"), width = 12)
+                box(title = "Tabla Comparativa",     DTOutput("comp_table"),     width = 12)
               )
       ),
       tabItem(tabName = "eda_model",
               fluidRow(
-                box(title = "Boxplot Mensual BTC", plotlyOutput("monthly_boxplot"), width = 6),
-                box(title = "Descomposición STL BTC", plotlyOutput("stl_plot"), width = 6)
+                box(title = "Boxplot Mensual BTC",    plotlyOutput("monthly_boxplot"), width = 6),
+                box(title = "Descomposición STL BTC", plotlyOutput("stl_plot"),        width = 6)
               ),
               fluidRow(
-                box(title = "ACF/PACF BTC", plotlyOutput("acf_pacf"), width = 12)
+                box(title = "ACF/PACF BTC",   plotlyOutput("acf_pacf"),  width = 12)
               ),
               fluidRow(
-                box(title = "Estacionariedad", DTOutput("adf_table"), width = 12)
+                box(title = "Estacionariedad", DTOutput("adf_table"),    width = 12)
               )
       ),
       tabItem(tabName = "arima",
@@ -1267,7 +1250,7 @@ ui <- dashboardPage(
                 box(title = "Diagnóstico de Residuos", plotOutput("resid_plots"), width = 12)
               ),
               fluidRow(
-                box(title = "Predicción vs Realidad", plotlyOutput("forecast_plot"), width = 12)
+                box(title = "Predicción vs Realidad",  plotlyOutput("forecast_plot"), width = 12)
               ),
               fluidRow(
                 box(title = "Métricas de Error", DTOutput("metrics_table"), width = 12)
@@ -1301,10 +1284,10 @@ ui <- dashboardPage(
 server <- function(input, output, session) {
 
   # Reactive values
-  hist_data_react <- reactive({ hist_data })
+  hist_data_react    <- reactive({ hist_data })
   prices_overview_react <- reactive({ prices_overview })
 
-  # --- Outputs para la pestaña "Visión General" ---
+  # --- Visión General ---
   output$btc_price <- renderValueBox({
     price <- prices_overview_react() %>% filter(simbolo == "BTC") %>% pull(precio)
     valueBox(value = dollar(price), subtitle = "Precio BTC", icon = icon("bitcoin"), color = "purple")
@@ -1329,8 +1312,7 @@ server <- function(input, output, session) {
       scale_fill_manual(values = COLOR_PALETTE) +
       scale_y_continuous(expand = expansion(mult = c(0, 0.15)),
                          labels = dollar_format(suffix = "B", scale = 1)) +
-      labs(title = "Capitalización de Mercado",
-           x = NULL, y = "Miles de millones USD") +
+      labs(title = "Capitalización de Mercado", x = NULL, y = "Miles de millones USD") +
       theme_minimal(base_size = 12)
     ggplotly(p, tooltip = "y")
   })
@@ -1361,10 +1343,9 @@ server <- function(input, output, session) {
       datatable(options = list(pageLength = 10, scrollX = TRUE), rownames = FALSE)
   })
 
-  # --- Outputs para la pestaña "Precios" ---
+  # --- Precios (sin candlestick) ---
   output$price_boxplot <- renderPlotly({
-    df <- hist_data_react() %>%
-      filter(fecha >= max(fecha) - 365)
+    df <- hist_data_react() %>% filter(fecha >= max(fecha) - 365)
     p <- ggplot(df, aes(x = simbolo, y = close, fill = simbolo)) +
       geom_boxplot(alpha = 0.7, outlier.color = "#e74c3c", outlier.size = 1.5) +
       stat_summary(fun = "mean", geom = "point", shape = 18, size = 4, color = "white") +
@@ -1379,48 +1360,25 @@ server <- function(input, output, session) {
   })
 
   output$btc_series <- renderPlotly({
-    df <- hist_data_react() %>%
-      filter(simbolo == "BTC") %>%
-      arrange(fecha)
+    df <- hist_data_react() %>% filter(simbolo == "BTC") %>% arrange(fecha)
     p <- ggplot(df, aes(x = fecha, y = close)) +
       geom_line(color = "#F7931A", linewidth = 0.7) +
       scale_y_continuous(labels = dollar) +
-      labs(title = "Bitcoin — Precio de Cierre Histórico",
-           x = NULL, y = "Precio (USD)") +
+      labs(title = "Bitcoin — Precio de Cierre Histórico", x = NULL, y = "Precio (USD)") +
       theme_minimal(base_size = 12)
     ggplotly(p, tooltip = c("x", "y"))
   })
 
-  output$candlestick <- renderPlotly({
-    df <- hist_data_react() %>%
-      filter(simbolo == "BTC") %>%
-      arrange(fecha) %>%
-      tail(60)
-    plot_ly(df, x = ~fecha, type = "candlestick",
-            open = ~open, close = ~close,
-            high = ~high, low = ~low,
-            increasing = list(line = list(color = "#2ecc71")),
-            decreasing = list(line = list(color = "#e74c3c"))) %>%
-      layout(title = "BTC — Últimas 60 Velas Diarias",
-             xaxis = list(title = ""),
-             yaxis = list(title = "Precio (USD)"),
-             paper_bgcolor = "white",
-             plot_bgcolor = "white")
-  })
-
   output$bollinger <- renderPlotly({
     df_btc <- hist_data_react() %>%
-      filter(simbolo == "BTC") %>%
-      arrange(fecha) %>%
-      select(fecha, close) %>%
-      drop_na()
+      filter(simbolo == "BTC") %>% arrange(fecha) %>%
+      select(fecha, close) %>% drop_na()
     bb <- calculate_bollinger_bands(df_btc$close, window = 20, sd_mult = 2)
     df_bb <- cbind(df_btc, bb) |> drop_na(sma, upper, lower) |> tail(365)
-
     p <- ggplot(df_bb, aes(x = fecha)) +
       geom_ribbon(aes(ymin = lower, ymax = upper), fill = "#3498db", alpha = 0.18) +
-      geom_line(aes(y = close, color = "Precio"), linewidth = 0.8) +
-      geom_line(aes(y = sma, color = "SMA 20"), linetype = "dashed", linewidth = 0.7) +
+      geom_line(aes(y = close, color = "Precio"),         linewidth = 0.8) +
+      geom_line(aes(y = sma,   color = "SMA 20"),         linetype = "dashed", linewidth = 0.7) +
       geom_line(aes(y = upper, color = "Banda Superior"), linetype = "dotted", linewidth = 0.6) +
       geom_line(aes(y = lower, color = "Banda Inferior"), linetype = "dotted", linewidth = 0.6) +
       scale_color_manual(values = c(
@@ -1430,48 +1388,39 @@ server <- function(input, output, session) {
       scale_y_continuous(labels = dollar) +
       labs(title = "Bandas de Bollinger — BTC (SMA 20, k = 2)",
            x = NULL, y = "Precio (USD)", color = NULL) +
-      theme_minimal(base_size = 12) +
-      theme(legend.position = "bottom")
+      theme_minimal(base_size = 12) + theme(legend.position = "bottom")
     ggplotly(p, tooltip = c("x", "y"))
   })
 
-  # --- Outputs para la pestaña "Retornos y Riesgo" ---
+  # --- Retornos y Riesgo ---
   output$ret_boxplot <- renderPlotly({
-    df <- hist_data_react() %>%
-      filter(fecha >= max(fecha) - 365)
+    df <- hist_data_react() %>% filter(fecha >= max(fecha) - 365)
     p <- ggplot(df, aes(x = simbolo, y = retorno, fill = simbolo)) +
       geom_boxplot(alpha = 0.7, outlier.color = "#e74c3c", outlier.size = 1) +
       geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
       scale_fill_manual(values = COLOR_PALETTE) +
       coord_flip() +
-      labs(title = "Distribución de Retornos Diarios",
-           x = NULL, y = "Retorno (%)") +
-      theme_minimal(base_size = 12) +
-      theme(legend.position = "none")
+      labs(title = "Distribución de Retornos Diarios", x = NULL, y = "Retorno (%)") +
+      theme_minimal(base_size = 12) + theme(legend.position = "none")
     ggplotly(p, tooltip = c("x", "y"))
   })
 
   output$hist_btc <- renderPlotly({
-    df <- hist_data_react() %>%
-      filter(simbolo == "BTC") %>%
-      drop_na(retorno)
+    df <- hist_data_react() %>% filter(simbolo == "BTC") %>% drop_na(retorno)
     p <- ggplot(df, aes(x = retorno, fill = after_stat(x) > 0)) +
       geom_histogram(bins = 60, alpha = 0.85) +
       scale_fill_manual(values = c("TRUE" = "#2ecc71", "FALSE" = "#e74c3c"),
-                        labels = c("TRUE" = "Positivo", "FALSE" = "Negativo"),
-                        name = NULL) +
+                        labels = c("TRUE" = "Positivo", "FALSE" = "Negativo"), name = NULL) +
       geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
       labs(title = "Histograma de Retornos Diarios — BTC",
            x = "Retorno (%)", y = "Frecuencia") +
-      theme_minimal(base_size = 12) +
-      theme(legend.position = "top")
+      theme_minimal(base_size = 12) + theme(legend.position = "top")
     ggplotly(p, tooltip = c("x", "y"))
   })
 
   output$vol_rolling <- renderPlotly({
     df_btc <- hist_data_react() %>%
-      filter(simbolo == "BTC") %>%
-      arrange(fecha) %>%
+      filter(simbolo == "BTC") %>% arrange(fecha) %>%
       mutate(vol30 = zoo::rollapply(retorno, 30, sd, fill = NA, align = "right")) %>%
       drop_na(vol30)
     p <- ggplot(df_btc, aes(x = fecha, y = vol30)) +
@@ -1492,12 +1441,11 @@ server <- function(input, output, session) {
         `Desv. Est. (%)` = round(sd(retorno, na.rm = TRUE), 3),
         `VaR 95% (%)`    = round(quantile(retorno, 0.05, na.rm = TRUE), 3),
         `Días pos. (%)`  = round(sum(retorno > 0, na.rm = TRUE) / n() * 100, 1)
-      ) %>%
-      arrange(desc(`Ret. Medio (%)`))
+      ) %>% arrange(desc(`Ret. Medio (%)`))
     datatable(df, options = list(pageLength = 10, scrollX = TRUE), rownames = FALSE)
   })
 
-  # --- Outputs para la pestaña "Correlaciones" ---
+  # --- Correlaciones ---
   output$cor_heatmap <- renderPlotly({
     df_wide <- hist_data_react() %>%
       filter(fecha >= max(fecha) - 365) %>%
@@ -1507,23 +1455,18 @@ server <- function(input, output, session) {
     mat_cor <- cor(df_wide, use = "complete.obs", method = "pearson")
     plot_ly(
       x = colnames(mat_cor), y = colnames(mat_cor), z = mat_cor,
-      type = "heatmap", colorscale = "RdBu", reversescale = TRUE,
-      zmin = -1, zmax = 1
+      type = "heatmap", colorscale = "RdBu", reversescale = TRUE, zmin = -1, zmax = 1
     ) %>%
-      layout(
-        title = "Mapa de Calor de Correlaciones (Pearson)",
-        xaxis = list(title = ""), yaxis = list(title = "")
-      )
+      layout(title = "Mapa de Calor de Correlaciones (Pearson)",
+             xaxis = list(title = ""), yaxis = list(title = ""))
   })
 
   output$scatter_plot <- renderPlotly({
-    x_sym <- input$corr_x
-    y_sym <- input$corr_y
+    x_sym <- input$corr_x; y_sym <- input$corr_y
     df <- hist_data_react() %>%
       filter(fecha >= max(fecha) - 365, simbolo %in% c(x_sym, y_sym)) %>%
       select(fecha, simbolo, retorno) %>%
-      pivot_wider(names_from = simbolo, values_from = retorno) %>%
-      drop_na()
+      pivot_wider(names_from = simbolo, values_from = retorno) %>% drop_na()
     p <- ggplot(df, aes(x = .data[[x_sym]], y = .data[[y_sym]])) +
       geom_point(alpha = 0.4, color = "#627EEA", size = 1.5) +
       geom_smooth(method = "lm", se = TRUE, color = "#e94560", linewidth = 1) +
@@ -1533,22 +1476,19 @@ server <- function(input, output, session) {
     ggplotly(p, tooltip = c("x", "y"))
   })
 
-  # --- Outputs para la pestaña "Comparador" ---
+  # --- Comparador ---
   output$comp_plot <- renderPlotly({
     df <- hist_data_react() %>%
-      filter(fecha >= max(fecha) - 365) %>%
-      arrange(fecha) %>%
+      filter(fecha >= max(fecha) - 365) %>% arrange(fecha) %>%
       group_by(simbolo) %>%
-      mutate(ini = first(close), norm = close / ini * 100) %>%
-      ungroup()
+      mutate(ini = first(close), norm = close / ini * 100) %>% ungroup()
     p <- ggplot(df, aes(x = fecha, y = norm, color = simbolo)) +
       geom_line(linewidth = 0.8, alpha = 0.9) +
       geom_hline(yintercept = 100, linetype = "dashed", color = "gray50") +
       scale_color_manual(values = COLOR_PALETTE) +
       labs(title = "Rendimiento Acumulado — Base 100 (últimos 365 días)",
            x = NULL, y = "Índice (base = 100)", color = "Moneda") +
-      theme_minimal(base_size = 12) +
-      theme(legend.position = "right")
+      theme_minimal(base_size = 12) + theme(legend.position = "right")
     ggplotly(p, tooltip = c("x", "y", "colour"))
   })
 
@@ -1561,22 +1501,19 @@ server <- function(input, output, session) {
         `P. Final ($)`   = round(last(close), 4),
         `Rend. (%)`      = round((last(close) - first(close)) / first(close) * 100, 2),
         `Vol. (%)`       = round(sd(retorno, na.rm = TRUE), 3)
-      ) %>%
-      arrange(desc(`Rend. (%)`))
+      ) %>% arrange(desc(`Rend. (%)`))
     datatable(df, options = list(pageLength = 10, scrollX = TRUE), rownames = FALSE)
   })
 
-  # --- Outputs para la pestaña "Análisis EDA" ---
+  # --- Análisis EDA ---
   output$monthly_boxplot <- renderPlotly({
     df_btc <- hist_data_react() %>%
       filter(simbolo == "BTC") %>%
-      mutate(mes = floor_date(fecha, "month"),
-             mes_label = format(mes, "%b %Y"))
+      mutate(mes = floor_date(fecha, "month"), mes_label = format(mes, "%b %Y"))
     p <- ggplot(df_btc, aes(x = reorder(mes_label, mes), y = retorno)) +
       geom_boxplot(fill = "#3498db", alpha = 0.7, outlier.size = 1) +
       geom_hline(yintercept = 0, linetype = "dashed", color = "gray40") +
-      labs(title = "Retornos Diarios de BTC por Mes",
-           x = NULL, y = "Retorno (%)") +
+      labs(title = "Retornos Diarios de BTC por Mes", x = NULL, y = "Retorno (%)") +
       theme_minimal(base_size = 11) +
       theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 7))
     ggplotly(p, tooltip = c("x", "y"))
@@ -1584,61 +1521,61 @@ server <- function(input, output, session) {
 
   output$acf_pacf <- renderPlotly({
     serie <- hist_data_react() %>%
-      filter(simbolo == "BTC") %>%
-      pull(retorno) %>%
-      na.omit()
+      filter(simbolo == "BTC") %>% pull(retorno) %>% na.omit()
     ci_val <- qnorm(0.975) / sqrt(length(serie))
-    acf_r <- acf(serie, plot = FALSE, lag.max = 40)
+    acf_r  <- acf(serie, plot = FALSE, lag.max = 40)
     pacf_r <- pacf(serie, plot = FALSE, lag.max = 40)
-    df_acf <- data.frame(Lag = as.numeric(acf_r$lag[-1]), ACF = as.numeric(acf_r$acf[-1]))
-    df_pacf <- data.frame(Lag = as.numeric(pacf_r$lag), PACF = as.numeric(pacf_r$acf))
+    df_acf  <- data.frame(Lag = as.numeric(acf_r$lag[-1]),  ACF  = as.numeric(acf_r$acf[-1]))
+    df_pacf <- data.frame(Lag = as.numeric(pacf_r$lag),     PACF = as.numeric(pacf_r$acf))
     p1 <- ggplot(df_acf, aes(x = Lag, y = ACF)) +
       geom_bar(stat = "identity", fill = "#3498db", alpha = 0.7) +
-      geom_hline(yintercept = c(ci_val, -ci_val), linetype = "dashed", color = "blue", linewidth = 0.7) +
+      geom_hline(yintercept = c(ci_val, -ci_val), linetype = "dashed",
+                 color = "blue", linewidth = 0.7) +
       labs(title = "ACF — Retornos BTC") + theme_minimal(base_size = 11)
     p2 <- ggplot(df_pacf, aes(x = Lag, y = PACF)) +
       geom_bar(stat = "identity", fill = "#e74c3c", alpha = 0.7) +
-      geom_hline(yintercept = c(ci_val, -ci_val), linetype = "dashed", color = "blue", linewidth = 0.7) +
+      geom_hline(yintercept = c(ci_val, -ci_val), linetype = "dashed",
+                 color = "blue", linewidth = 0.7) +
       labs(title = "PACF — Retornos BTC") + theme_minimal(base_size = 11)
     subplot(ggplotly(p1), ggplotly(p2), nrows = 1, shareX = TRUE, titleX = TRUE, titleY = TRUE)
   })
 
   output$stl_plot <- renderPlotly({
     serie_btc <- hist_data_react() %>%
-      filter(simbolo == "BTC") %>%
-      pull(retorno) %>%
-      na.omit()
+      filter(simbolo == "BTC") %>% pull(retorno) %>% na.omit()
     serie_stl <- ts(serie_btc, frequency = 7)
     decomp <- stl(serie_stl, s.window = "periodic", robust = TRUE)
     df_decomp <- data.frame(
-      time = as.numeric(time(decomp$time.series)),
-      trend = as.numeric(decomp$time.series[, "trend"]),
-      seasonal = as.numeric(decomp$time.series[, "seasonal"]),
+      time      = as.numeric(time(decomp$time.series)),
+      trend     = as.numeric(decomp$time.series[, "trend"]),
+      seasonal  = as.numeric(decomp$time.series[, "seasonal"]),
       remainder = as.numeric(decomp$time.series[, "remainder"])
     )
-    p_trend <- ggplot(df_decomp, aes(x = time, y = trend)) + geom_line(color = "#2c3e50") + labs(y = "Tendencia") + theme_minimal()
-    p_seas <- ggplot(df_decomp, aes(x = time, y = seasonal)) + geom_line(color = "#3498db") + labs(y = "Estacionalidad") + theme_minimal()
-    p_rem <- ggplot(df_decomp, aes(x = time, y = remainder)) + geom_line(color = "#e74c3c") + labs(y = "Residuo") + theme_minimal()
-    subplot(ggplotly(p_trend), ggplotly(p_seas), ggplotly(p_rem), nrows = 3, shareX = TRUE, titleY = TRUE)
+    p_trend <- ggplot(df_decomp, aes(x = time, y = trend))     + geom_line(color = "#2c3e50") + labs(y = "Tendencia")     + theme_minimal()
+    p_seas  <- ggplot(df_decomp, aes(x = time, y = seasonal))  + geom_line(color = "#3498db") + labs(y = "Estacionalidad")+ theme_minimal()
+    p_rem   <- ggplot(df_decomp, aes(x = time, y = remainder))  + geom_line(color = "#e74c3c") + labs(y = "Residuo")       + theme_minimal()
+    subplot(ggplotly(p_trend), ggplotly(p_seas), ggplotly(p_rem),
+            nrows = 3, shareX = TRUE, titleY = TRUE)
   })
 
   output$adf_table <- renderDT({
     cryptos <- unique(hist_data$simbolo)
     adf_res <- lapply(cryptos, function(cr) {
       serie <- na.omit(hist_data[hist_data$simbolo == cr, "retorno"][[1]])
-      res <- test_stationarity(serie)
-      data.frame(Moneda = cr, `ADF Stat.` = round(res$estadistico, 4),
-                 `p-valor` = round(res$p_valor, 6),
-                 Estacionaria = ifelse(res$es_estacionaria, "✅ Sí", "❌ No"),
-                 `d recomendado` = ifelse(res$es_estacionaria, 0, 1))
+      res   <- test_stationarity(serie)
+      data.frame(
+        Moneda = cr,
+        `ADF Stat.` = round(res$estadistico, 4),
+        `p-valor`   = round(res$p_valor, 6),
+        Estacionaria = ifelse(res$es_estacionaria, "✅ Sí", "❌ No"),
+        `d recomendado` = ifelse(res$es_estacionaria, 0, 1)
+      )
     }) |> bind_rows()
     datatable(adf_res, options = list(pageLength = 10, scrollX = TRUE), rownames = FALSE)
   })
 
-  # --- Outputs para la pestaña "Modelo ARIMA" ---
-  output$arima_summary <- renderPrint({
-    summary(best_model)
-  })
+  # --- Modelo ARIMA ---
+  output$arima_summary <- renderPrint({ summary(best_model) })
 
   output$resid_plots <- renderPlot({
     par(mfrow = c(1, 2))
@@ -1650,16 +1587,11 @@ server <- function(input, output, session) {
   output$forecast_plot <- renderPlotly({
     n_hist <- min(200, length(train))
     df_forecast <- bind_rows(
-      data.frame(Fecha = tail(train_dates, n_hist),
-                 Precio = tail(train, n_hist), Tipo = "Entrenamiento"),
-      data.frame(Fecha = test_dates[1:horizonte],
-                 Precio = test[1:horizonte], Tipo = "Test Real"),
-      data.frame(Fecha = test_dates[1:horizonte],
-                 Precio = pred, Tipo = "Predicción"),
-      data.frame(Fecha = test_dates[1:horizonte],
-                 Precio = as.numeric(fc$lower[,2]), Tipo = "IC 95% Inferior"),
-      data.frame(Fecha = test_dates[1:horizonte],
-                 Precio = as.numeric(fc$upper[,2]), Tipo = "IC 95% Superior")
+      data.frame(Fecha = tail(train_dates, n_hist),  Precio = tail(train, n_hist), Tipo = "Entrenamiento"),
+      data.frame(Fecha = test_dates[1:horizonte],    Precio = test[1:horizonte],   Tipo = "Test Real"),
+      data.frame(Fecha = test_dates[1:horizonte],    Precio = pred,                Tipo = "Predicción"),
+      data.frame(Fecha = test_dates[1:horizonte],    Precio = as.numeric(fc$lower[,2]), Tipo = "IC 95% Inferior"),
+      data.frame(Fecha = test_dates[1:horizonte],    Precio = as.numeric(fc$upper[,2]), Tipo = "IC 95% Superior")
     )
     df_ribbon <- data.frame(
       Fecha = test_dates[1:horizonte],
@@ -1672,54 +1604,53 @@ server <- function(input, output, session) {
                   fill = "#3498db", alpha = 0.2) +
       geom_line(data = df_lines, aes(x = Fecha, y = Precio, color = Tipo, linewidth = Tipo)) +
       scale_color_manual(values = c(
-        "Entrenamiento" = "#2c3e50",
-        "Test Real" = "#3498db",
-        "Predicción" = "#e74c3c"
+        "Entrenamiento" = "#2c3e50", "Test Real" = "#3498db", "Predicción" = "#e74c3c"
       )) +
       scale_linewidth_manual(values = c(
         "Entrenamiento" = 0.7, "Test Real" = 0.9, "Predicción" = 1.1
       )) +
       scale_y_continuous(labels = dollar) +
       labs(
-        title = sprintf("ARIMA(%d,%d,%d) — Predicción vs Realidad — BTC",
-                        best_order[1], best_order[2], best_order[3]),
+        title    = sprintf("ARIMA(%d,%d,%d) — Predicción vs Realidad — BTC",
+                           best_order[1], best_order[2], best_order[3]),
         subtitle = sprintf("MAE: $%.0f | RMSE: $%.0f | MAPE: %.2f%% | R²: %.4f",
-                          mae, rmse, mape, r2),
-        x = NULL, y = "Precio (USD)",
-        color = NULL, linewidth = NULL
+                           mae, rmse, mape, r2),
+        x = NULL, y = "Precio (USD)", color = NULL, linewidth = NULL
       ) +
-      theme_minimal(base_size = 12) +
-      theme(legend.position = "bottom")
+      theme_minimal(base_size = 12) + theme(legend.position = "bottom")
     ggplotly(p, tooltip = c("x", "y", "colour"))
   })
 
   output$metrics_table <- renderDT({
     metricas <- data.frame(
       Métrica = c("MAE (USD)", "RMSE (USD)", "MAPE (%)", "R²"),
-      Valor = round(c(mae, rmse, mape, r2), 4)
+      Valor   = round(c(mae, rmse, mape, r2), 4)
     )
     datatable(metricas, options = list(dom = 't'), rownames = FALSE)
   })
 
-  # --- Outputs para la pestaña "Predicción Óptima" ---
+  # --- Predicción Óptima ---
   output$best_forecast_plot <- renderPlotly({
     n_ctx <- min(120, length(train_opt))
     df_ctx <- data.frame(
-      Fecha = tail(train_dates_opt, n_ctx),
+      Fecha  = tail(train_dates_opt, n_ctx),
       Precio = tail(train_opt, n_ctx)
     )
     p <- ggplot() +
-      geom_line(data = df_ctx, aes(x = Fecha, y = Precio), color = "#2c3e50", linewidth = 0.8) +
+      geom_line(data = df_ctx, aes(x = Fecha, y = Precio),
+                color = "#2c3e50", linewidth = 0.8) +
       geom_ribbon(data = df_pred_opt,
-                  aes(x = Fecha, ymin = Lower_95, ymax = Upper_95), fill = "#3498db", alpha = 0.18) +
+                  aes(x = Fecha, ymin = Lower_95, ymax = Upper_95),
+                  fill = "#3498db", alpha = 0.18) +
       geom_ribbon(data = df_pred_opt,
-                  aes(x = Fecha, ymin = Lower_80, ymax = Upper_80), fill = "#3498db", alpha = 0.28) +
+                  aes(x = Fecha, ymin = Lower_80, ymax = Upper_80),
+                  fill = "#3498db", alpha = 0.28) +
       geom_line(data = df_pred_opt, aes(x = Fecha, y = Prediccion),
                 color = "#e74c3c", linewidth = 1.1) +
       scale_y_continuous(labels = dollar) +
       labs(
-        title = sprintf("Predicción Óptima 30 días — BTC | ARIMA(%d,%d,%d) por BIC",
-                        best_ord2[1], best_ord2[2], best_ord2[3]),
+        title    = sprintf("Predicción Óptima 30 días — BTC | ARIMA(%d,%d,%d) por BIC",
+                           best_ord2[1], best_ord2[2], best_ord2[3]),
         subtitle = "Azul: IC 80% y 95% | Rojo: Predicción puntual | Gris: Historial",
         x = NULL, y = "Precio (USD)"
       ) +
@@ -1730,16 +1661,16 @@ server <- function(input, output, session) {
   output$pred_table <- renderDT({
     df_pred_opt %>%
       mutate(
-        Fecha = format(Fecha, "%d/%m/%Y"),
+        Fecha      = format(Fecha, "%d/%m/%Y"),
         Prediccion = dollar(Prediccion, accuracy = 1),
-        `IC 80%` = paste0(dollar(Lower_80, accuracy = 1), " — ", dollar(Upper_80, accuracy = 1)),
-        `IC 95%` = paste0(dollar(Lower_95, accuracy = 1), " — ", dollar(Upper_95, accuracy = 1))
+        `IC 80%`   = paste0(dollar(Lower_80, accuracy = 1), " — ", dollar(Upper_80, accuracy = 1)),
+        `IC 95%`   = paste0(dollar(Lower_95, accuracy = 1), " — ", dollar(Upper_95, accuracy = 1))
       ) %>%
       select(Fecha, Prediccion, `IC 80%`, `IC 95%`) %>%
       datatable(options = list(pageLength = 10, scrollX = TRUE), rownames = FALSE)
   })
 
-  # --- Outputs para la pestaña "Valores Faltantes" ---
+  # --- Valores Faltantes ---
   output$nas_heatmap <- renderPlotly({
     cols <- c("close","retorno","retorno_log","volatilidad")
     df_heat <- hist_data_react() %>%
@@ -1751,8 +1682,7 @@ server <- function(input, output, session) {
       geom_tile(color = "white", linewidth = 0.5) +
       geom_text(aes(label = paste0(round(pct_na, 1), "%")), size = 3) +
       scale_fill_gradient(low = "white", high = "#e74c3c", name = "% NA") +
-      labs(title = "Porcentaje de NAs por moneda y variable",
-           x = NULL, y = NULL) +
+      labs(title = "Porcentaje de NAs por moneda y variable", x = NULL, y = NULL) +
       theme_minimal(base_size = 12) +
       theme(axis.text.x = element_text(angle = 30, hjust = 1))
     ggplotly(p, tooltip = c("x", "y", "fill"))
@@ -1762,10 +1692,10 @@ server <- function(input, output, session) {
     ms_global <- hist_data_react() %>%
       group_by(simbolo) %>%
       summarise(
-        Total_filas = n(),
-        NAs_close = sum(is.na(close)),
-        NAs_retorno = sum(is.na(retorno)),
-        NAs_vol = sum(is.na(volatilidad)),
+        Total_filas  = n(),
+        NAs_close    = sum(is.na(close)),
+        NAs_retorno  = sum(is.na(retorno)),
+        NAs_vol      = sum(is.na(volatilidad)),
         Pct_NA_close = round(NAs_close / Total_filas * 100, 2)
       )
     datatable(ms_global, options = list(pageLength = 10, scrollX = TRUE), rownames = FALSE)
@@ -1784,94 +1714,4 @@ Para ejecutar el dashboard localmente, guarda los códigos anteriores en archivo
 shiny::runApp()
 ```
 
-También puedes desplegar el dashboard en [shinyapps.io](https://www.shinyapps.io/) utilizando el paquete `rsconnect`:
-
-```r
-library(rsconnect)
-rsconnect::deployApp()
-```
-
----
-
-# Ecuaciones y Marco Matemático {#ecuaciones}
-
-## Resumen de Fórmulas
-
-| Concepto | Fórmula |
-|---|---|
-| Retorno simple | $r_t = \frac{P_t - P_{t-1}}{P_{t-1}} \times 100$ |
-| Retorno logarítmico | $r_t^{log} = \ln\left(\frac{P_t}{P_{t-1}}\right) \times 100$ |
-| Volatilidad diaria | $v_t = \frac{High_t - Low_t}{Open_t} \times 100$ |
-| SMA | $SMA_n = \frac{1}{n}\sum_{i=0}^{n-1} P_{t-i}$ |
-| Banda de Bollinger | $BB_{\pm} = SMA_n \pm k \cdot \sigma_n$ |
-| Ancho de banda | $\%Bw = \frac{BB_{+} - BB_{-}}{SMA_n} \times 100$ |
-| VaR 95% | $VaR_{95\%} = Q_{0.05}(r_t)$ |
-| Volatilidad rodante | $\sigma_{30} = \sqrt{\frac{1}{29}\sum_{i=0}^{29}(r_{t-i} - \bar{r})^2}$ |
-| Descomposición STL | $Y(t) = T(t) + S(t) + R(t)$ |
-| Modelo ARIMA(p,d,q) | $\phi(B)(1-B)^d y_t = \theta(B)\varepsilon_t$ |
-
----
-
-# Conclusiones y Próximos Pasos {#conclusiones}
-
-## Hallazgos Principales
-
-1. **Heterogeneidad de precios**: el rango de precios entre las 10 criptomonedas abarca varios órdenes de magnitud (de \$0.10 en DOGE a más de \$50,000 en BTC), lo que hace necesario el uso de escala logarítmica en las comparativas.
-
-2. **Distribución de retornos**: todos los activos muestran colas pesadas (fat tails) y ligera asimetría, comportamiento típico de activos financieros de alto riesgo. Las stablecoins (USDC, USDT, USD1) presentan retornos casi nulos con muy baja varianza.
-
-3. **Correlaciones**: BTC y ETH muestran alta correlación positiva (~0.7–0.8 en períodos recientes), mientras que las stablecoins presentan correlación cercana a cero con el resto del mercado.
-
-4. **Estacionariedad**: los *precios* de cierre son no-estacionarios (no rechazan H₀ en ADF), mientras que los *retornos diarios* sí son estacionarios en la mayoría de los activos, confirmando que d=1 es el orden adecuado para modelar precios.
-
-5. **Modelo ARIMA**: se identificó automáticamente el mejor orden (p, d, q) por criterio AIC/BIC para cada activo. Los modelos exhiben residuos con baja autocorrelación (Ljung-Box no significativo), aunque la no-normalidad de los residuos sugiere la posibilidad de mejorar con modelos GARCH o variantes con distribución t-Student.
-
-## Próximos Pasos
-
-- **Modelos GARCH**: capturar la heterocedasticidad condicional (agrupamiento de volatilidad) presente en las series de criptomonedas.
-- **Validación walk-forward**: rolling forecast con ventana expandible para evaluación robusta fuera de muestra.
-- **Modelos multivariados**: VAR / VECM para explotar las correlaciones entre activos en la predicción.
-- **Redes neuronales**: comparar ARIMA con LSTM y Prophet para series temporales financieras.
-- **Intervalos de predicción calibrados**: mejorar la cobertura empírica de los IC mediante bootstrapping.
-
----
-
-# Información del Proyecto {#info}
-
-## Equipo
-
-| Integrante | Programa | GitHub |
-|---|---|---|
-| **Mateo Barrios** | Ciencia de Datos | [Mateo3008](https://github.com/Mateo3008/Crypto_EDA_App) |
-| **Rafael Romero** | Ciencia de Datos | [rafaelromero06](https://github.com/rafaelromero06) |
-
-## Cómo Reproducir Este Documento
-
-```r
-# 1. Instalar dependencias
-install.packages(c(
-  "bookdown", "tidyverse", "plotly", "DT", "lubridate",
-  "scales", "jsonlite", "httr", "zoo", "forecast", "tseries",
-  "knitr", "kableExtra", "gridExtra", "shiny", "shinydashboard"
-))
-
-# 2. Renderizar
-bookdown::render_book("Crypto_EDA_Bookdown.Rmd", "bookdown::html_document2")
-
-# O con rmarkdown directamente:
-rmarkdown::render("Crypto_EDA_Bookdown.Rmd")
-```
-
-## Fuentes
-
-- **Datos**: [CryptoCompare API](https://min-api.cryptocompare.com/)
-- **Framework**: [R Shiny](https://shiny.posit.co/) + [shinydashboard](https://rstudio.github.io/shinydashboard/)
-- **Despliegue**: [shinyapps.io](https://www.shinyapps.io/)
-- **Repositorio**: [github.com/Mateo3008/Crypto_EDA_App](https://github.com/Mateo3008/Crypto_EDA_App)
-
----
-
-```{r session-info, echo=FALSE}
-cat("Sesión R generada el", format(Sys.time(), "%d/%m/%Y %H:%M"), "\n")
-sessionInfo()
-```
+También puedes desplegar el dashboard en [shinyapps.io](https://www.shinyapps.io/) utilizando el paquete `rsconnect`
